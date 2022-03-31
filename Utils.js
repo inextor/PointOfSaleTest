@@ -52,9 +52,25 @@ function doPost(path, body, bearer)
 	}).then(r=>r.json());
 }
 
-function login()
+function login(user_type)
 {
-	return doPost(end_point+'/login.php', {
+	let user = 'admin';
+
+	if( user_type == 'admin' )
+	{
+		user = 'admin';
+	}
+	else if( user_type == 'cashier' )
+	{
+		user = 'admin';
+	}
+	else if( user_type == 'cashier' )
+	{
+		user = 'admin';
+	}
+
+	return doPost(end_point+'/login.php',
+	{
 			"username": "admin",
 			"password": "asdf"
 	}).then((data)=>
