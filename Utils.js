@@ -1,3 +1,5 @@
+let end_point = 'http://127.0.0.1/PointOfSale'
+let referrer = 'http://127.0.0.1';
 
 function doGet(path,bearer)
 {
@@ -11,7 +13,7 @@ function doGet(path,bearer)
 		headers['Authorization'] = 'Bearer ' + bearer;
 	}
 
-	return fetch(path, {
+	return fetch(end_point+path, {
 		"headers": {
 			"accept": "application/json, text/plain, */*",
 			"content-type": "application/json",
@@ -38,11 +40,8 @@ function doPost(path, body, bearer)
 		headers['Authorization'] = 'Bearer ' + bearer;
 	}
 
-	return fetch(path, {
-		"headers": {
-			"accept": "application/json, text/plain, */*",
-			"content-type": "application/json",
-		},
+	return fetch(end_point+path, {
+		"headers": headers,
 		"referrer": end_point,
 		"referrerPolicy": "strict-origin-when-cross-origin",
 		"body": JSON.stringify(body),
@@ -69,7 +68,7 @@ function login(user_type)
 		user = 'admin';
 	}
 
-	return doPost(end_point+'/login.php',
+	return doPost('/login.php',
 	{
 			"username": "admin",
 			"password": "asdf"
@@ -79,8 +78,32 @@ function login(user_type)
 	});
 }
 
+function getItem(bearer)
+{
+	return doPost('/item_info.php',
+		{
+			"item": 
+			{
+				"availability_type": "ON_STOCK",
+				"clave_sat": "53111603",
+				"name": "Item Test "+Date.now(),
+				"note_required": "NO",
+				"on_sale": "NO",
+				"reference_price": 0,
+				"status": "ACTIVE",
+				"unidad_medida_sat_id": "H87",
+			},
+		},bearer
+	)
+	.then((response)=>
+	{
+		return response.item.id;
+	});
+}
 
 function hasPassword(obj)
 {
 	return false;
 }
+
+

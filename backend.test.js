@@ -73,7 +73,33 @@ QUnit.module('Sell', function()
 {
 	QUnit.test('Sell Simple', (assert) =>
 	{
-		assert.ok(true, 'Sell Simple');
+		const done = assert.async();
+		assert.expect(3);
+
+		login('admin').then((bearer)=>
+		{
+			assert.ok(true,'Login');
+			return Promise.all([
+				getItem(bearer),
+				getItem(bearer),
+				getItem(bearer),
+				getItem(bearer),
+				getItem(bearer),
+				bearer
+			]);
+		})
+		.then((ids)=>
+		{
+			let bearer = ids[ids.length-1];
+			assert.equal( ids.length, 6, 'Items Creados');
+			let order = getOrderItemWithPrimes(ids);
+			return doPost('/order_info.php', order , bearer)
+		})
+		.then(()=>
+		{
+			assert.ok(true, 'Orden Creada');
+			done();
+		})
 	});
 
 	QUnit.test('Sell With Options', (assert) =>
