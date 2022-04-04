@@ -48,7 +48,24 @@ function doPost(path, body, bearer)
 		"method": "POST",
 		"mode": "cors",
 		"credentials": "omit"
-	}).then(r=>r.json());
+	})
+	.then((r)=>
+	{
+		console.log('Returns', r );
+		if( r.status >= 200 && r.status < 300 )
+		{
+			return r.json();
+		}
+		else
+		{
+			return r.json().then(e=>{
+				throw e;
+			});
+		}
+	})
+	.then((response)=>{
+		return { result: response, bearer: bearer }
+	});
 }
 
 function login(user_type)
@@ -74,7 +91,7 @@ function login(user_type)
 			"password": "asdf"
 	}).then((data)=>
 	{
-		return data.session.id;
+		return data.result.session.id;
 	});
 }
 
@@ -84,7 +101,7 @@ function getItem(bearer)
 		{
 			"item": 
 			{
-				"availability_type": "ON_STOCK",
+				"availability_type": "ALWAYS",
 				"clave_sat": "53111603",
 				"name": "Item Test "+Date.now(),
 				"note_required": "NO",
@@ -97,7 +114,7 @@ function getItem(bearer)
 	)
 	.then((response)=>
 	{
-		return response.item.id;
+		return response.result.item.id;
 	});
 }
 

@@ -74,12 +74,14 @@ QUnit.module('Sell', function()
 	QUnit.test('Sell Simple', (assert) =>
 	{
 		const done = assert.async();
-		assert.expect(3);
+		assert.expect(4);
 
 		login('admin').then((bearer)=>
 		{
 			assert.ok(true,'Login');
 			return Promise.all([
+				getItem(bearer),
+				getItem(bearer),
 				getItem(bearer),
 				getItem(bearer),
 				getItem(bearer),
@@ -91,15 +93,29 @@ QUnit.module('Sell', function()
 		.then((ids)=>
 		{
 			let bearer = ids[ids.length-1];
-			assert.equal( ids.length, 6, 'Items Creados');
+			assert.equal( ids.length, 8, 'Items Creados');
 			let order = getOrderItemWithPrimes(ids);
 			return doPost('/order_info.php', order , bearer)
 		})
-		.then(()=>
+		.then((response)=>
 		{
 			assert.ok(true, 'Orden Creada');
+
+			let order_info = response.result;
+
+			let payment = getPaymentSimple( order_info.order.id, order_info.order.total );
+			return doPost('/payment_info.php', payment, response.bearer);
+		})
+		.then((result)=>
+		{
+			assert.ok(true, 'Pago Realizado');
 			done();
 		})
+		.catch((error)=>{
+			console.log(error); 
+			assert.ok(false, 'Fallo en algo');
+			done();
+		});
 	});
 
 	QUnit.test('Sell With Options', (assert) =>
@@ -107,15 +123,13 @@ QUnit.module('Sell', function()
 		const done = assert.async();
 
 		login('admin').then((bearer)=>{
-			return Promise.all([doPost('/item_info.php', [
-				{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ON_STOCK",on_sale:"NO","name":"Opcion1"}},
-				{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ON_STOCK",on_sale:"NO","name":"Opcion2"}},
-				{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ON_STOCK",on_sale:"NO","name":"Opcion3"}}
-			],bearer), bearer ]); })
-		.then((results)=>
+			return doPost('/item_info.php',[{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ALWAYS",on_sale:"NO","name":"Opcion1"}},
+				{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ALWAYS",on_sale:"NO","name":"Opcion2"}},
+				{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ALWAYS",on_sale:"NO","name":"Opcion3"}}],bearer);
+		})
+		.then((response)=>
 		{
-			let products = results[0];
-			let bearer = results[1];
+			let products = response.results;
 
 			assert.ok(true, 'Creacion Articulos de opciones');
 
@@ -132,7 +146,7 @@ QUnit.module('Sell', function()
 					}
 				]
 			};
-			return doPost('/item_info.php', item_compuesto , bearer)
+			return doPost('/item_info.php', item_compuesto , response.bearer)
 		})
 		.then(()=>
 		{
