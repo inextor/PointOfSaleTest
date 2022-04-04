@@ -14,16 +14,29 @@ function doGet(path,bearer)
 	}
 
 	return fetch(end_point+path, {
-		"headers": {
-			"accept": "application/json, text/plain, */*",
-			"content-type": "application/json",
-		},
+		"headers": headers,
 		"referrer": end_point,
 		"referrerPolicy": "strict-origin-when-cross-origin",
 		"method": "GET",
 		"mode": "cors",
 		"credentials": "omit"
-	}).then(r=>r.json());
+	})
+	.then((r)=>
+	{
+		if( r.status >= 200 && r.status < 300 )
+		{
+			return r.json();
+		}
+		else
+		{
+			return r.json().then(e=>{
+				throw e;
+			});
+		}
+	})
+	.then((response)=>{
+		return { result: response, bearer: bearer }
+	});
 }
 
 
@@ -51,7 +64,6 @@ function doPost(path, body, bearer)
 	})
 	.then((r)=>
 	{
-		console.log('Returns', r );
 		if( r.status >= 200 && r.status < 300 )
 		{
 			return r.json();

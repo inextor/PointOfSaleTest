@@ -11,16 +11,18 @@ QUnit.module('Stores', function()
 		const done = assert.async();
 
 		doGet('/store.php')
-		.then((data)=>
+		.then((response)=>
 		{
+			let data =response.result;
+
 			assert.ok(true, 'Request was successful');
 			assert.ok(typeof data.total == "number", 'Total encontrado');
 			assert.ok(Array.isArray(data.data), 'Data es Array');
 			return doGet('/store.php?id='+data.data[0].id);
 		})
-		.then((store)=>
+		.then((response)=>
 		{
-			console.log( store );
+			let store = response.result;
 			//assert.stricEqual(typeof store.id,"number",'Contiene un id');
 			assert.equal(typeof store.id,"number",'Contiene un id');
 			assert.equal(typeof store.name,"string",'Tiene un nombre');
@@ -74,7 +76,7 @@ QUnit.module('Sell', function()
 	QUnit.test('Sell Simple', (assert) =>
 	{
 		const done = assert.async();
-		assert.expect(4);
+		assert.expect(5);
 
 		login('admin').then((bearer)=>
 		{
@@ -106,9 +108,29 @@ QUnit.module('Sell', function()
 			let payment = getPaymentSimple( order_info.order.id, order_info.order.total );
 			return doPost('/payment_info.php', payment, response.bearer);
 		})
-		.then((result)=>
+		.then((response)=>
 		{
 			assert.ok(true, 'Pago Realizado');
+
+			let payment_info = response.result;
+			console.log( payment_info );
+
+			let id = null;
+			try{
+				console.log('Movements', payment_info.movements[0] )
+				console.log('Movements Orders', payment_info.movements[0].bank_movement_orders )
+				id = payment_info.movements[0].bank_movement_orders[0].id;
+			}
+			catch(e)
+			{
+				throw e;
+			}
+			return doGet('/order_info.php?id='+id, response.bearer);
+		})
+		.then((response)=>
+		{
+			let order_info = response.result;
+			assert.equal(order_info.order.paid_status, 'PAID', 'Orden Pagada');
 			done();
 		})
 		.catch((error)=>{
@@ -122,10 +144,16 @@ QUnit.module('Sell', function()
 	{
 		const done = assert.async();
 
-		login('admin').then((bearer)=>{
-			return doPost('/item_info.php',[{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ALWAYS",on_sale:"NO","name":"Opcion1"}},
-				{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ALWAYS",on_sale:"NO","name":"Opcion2"}},
-				{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ALWAYS",on_sale:"NO","name":"Opcion3"}}],bearer);
+		login('admin')
+		.then((bearer)=>
+		{
+			return doPost('/item_info.php',
+				[
+					{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ALWAYS",on_sale:"NO","name":"Opcion1"}},
+					{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ALWAYS",on_sale:"NO","name":"Opcion2"}},
+					{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ALWAYS",on_sale:"NO","name":"Opcion3"}}
+				],bearer
+			);
 		})
 		.then((response)=>
 		{
