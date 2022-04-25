@@ -119,7 +119,8 @@ QUnit.module('Sell', function()
 			try{
 				console.log('Movements', payment_info.movements[0] )
 				console.log('Movements Orders', payment_info.movements[0].bank_movement_orders )
-				id = payment_info.movements[0].bank_movement_orders[0].id;
+				id = payment_info.movements[0].bank_movement_orders[0].order_id;
+				console.log('ID is ', id);
 			}
 			catch(e)
 			{
@@ -134,11 +135,12 @@ QUnit.module('Sell', function()
 			done();
 		})
 		.catch((error)=>{
-			console.log(error); 
+			console.log('Sell simple ',error); 
 			assert.ok(false, 'Fallo en algo');
 			done();
 		});
 	});
+	/*
 
 	QUnit.test('Sell With Options', (assert) =>
 	{
@@ -188,6 +190,7 @@ QUnit.module('Sell', function()
 			done();
 		});
 	});
+	*/
 
 	QUnit.test('Sell With Stock', (assert) =>
 	{
