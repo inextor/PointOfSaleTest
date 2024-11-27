@@ -29,7 +29,8 @@ QUnit.module('Stores', function()
 			assert.ok(timestamp_regex.test( store.created ),'Has creation date');
 			assert.ok(timestamp_regex.test( store.updated ),'Has updated date');
 			done();
-		}).catch(()=>{
+		}).catch((e)=>{
+			console.log(e);
 			assert.ok(false, 'Fallo checar stores');
 			done();
 		});
@@ -49,10 +50,10 @@ QUnit.module('Stores', function()
 				error.log('Por que hno termina1');
 				done();
 			}
-			,((error)=>{ 
+			,((error)=>{
 				assert.ok(true, 'Fallo User Me');
 				console.log('Por que hno termina2');
-				done(); 
+				done();
 			})
 		).catch(()=>{
 			console.log('Fallo');
@@ -73,13 +74,21 @@ QUnit.module('User',function()
 
 QUnit.module('Sell', function()
 {
-	QUnit.test('Sell Simple', (assert) =>
+	QUnit.test('Sell duplicate', (assert) =>
 	{
 		const done = assert.async();
-		assert.expect(5);
+		assert.expect(4);
+
+		let d = new Date();
+		console.log( d.getFullYear() );
+
+		console.log( d );
+		let random = ''+(d.getFullYear())+'-'+d.getMonth()+'-'-d.getDate()+' '+d.getHours()+':'+d.getMinutes()+':'+d.getSeconds();
+		console.log('Random is',random);
 
 		login('admin').then((bearer)=>
 		{
+			console.log('Running 1');
 			assert.ok(true,'Login');
 			return Promise.all([
 				getItem(bearer),
@@ -88,8 +97,61 @@ QUnit.module('Sell', function()
 				getItem(bearer),
 				getItem(bearer),
 				getItem(bearer),
+				getItem(bearer,'ON_STOCK',200,1),
+				Promise.resolve( bearer )
+			]);
+		})
+		.then((ids)=>
+		{
+			let bearer = ids[ids.length-1];
+			assert.equal( ids.length, 8, 'Items Creados');
+			let order = getOrderItemWithPrimes(ids);
+			order.order.sync_id = random;
+			return Promise.all([
+				doPost('/order_info.php', order , bearer),
+				doPost('/order_info.php', order , bearer)
+			]).then(()=>
+			{
+				return Promise.resolve( ids );
+			})
+		})
+		.then((ids)=>
+		{
+			assert.ok(true,'ordenes creadas');
+			let bearer = ids[ids.length-1];
+			return doGet('/order_info.php?sync_id,='+random,bearer);
+		})
+		.then((response)=>
+		{
+			console.log( response );
+			assert.ok(response.result.data.length==1,'Orden creada sin duplicados');
+			done();
+		})
+		.catch((error)=>{
+			console.log(error);
+			assert.ok(false, 'Fallo en algo');
+			done();
+		});
+	})
+
+	QUnit.test('Sell Simple', (assert) =>
+	{
+		const done = assert.async();
+		assert.expect(5);
+
+		login('admin').then((bearer)=>
+		{
+			console.log('Running 1');
+			assert.ok(true,'Login');
+			return Promise.all([
 				getItem(bearer),
-				bearer
+				getItem(bearer),
+				getItem(bearer),
+				getItem(bearer),
+				getItem(bearer),
+				getItem(bearer),
+				getItem(bearer,'ON_STOCK',200,1),
+				Promise.resolve( bearer )
 			]);
 		})
 		.then((ids)=>
@@ -103,6 +165,7 @@ QUnit.module('Sell', function()
 		{
 			assert.ok(true, 'Orden Creada');
 
+			console.log('Orden', response.result );
 			let order_info = response.result;
 
 			let payment = getPaymentSimple( order_info.order.id, order_info.order.total );
@@ -120,10 +183,11 @@ QUnit.module('Sell', function()
 				console.log('Movements', payment_info.movements[0] )
 				console.log('Movements Orders', payment_info.movements[0].bank_movement_orders )
 				id = payment_info.movements[0].bank_movement_orders[0].order_id;
-				console.log('ID is ', id);
+				console.log('Obteniendo orden_id', id );
 			}
 			catch(e)
 			{
+				console.log("Que fallo????",e);
 				throw e;
 			}
 			return doGet('/order_info.php?id='+id, response.bearer);
@@ -131,6 +195,7 @@ QUnit.module('Sell', function()
 		.then((response)=>
 		{
 			let order_info = response.result;
+			console.log('Order Info', order_info);
 			assert.equal(order_info.order.paid_status, 'PAID', 'Orden Pagada');
 			done();
 		})
@@ -167,9 +232,9 @@ QUnit.module('Sell', function()
 				note_required:"NO",availability_type:"ALWAYS",on_sale:"YES",status:"ACTIVE",name:"compuesto"},options:[
 					{
 						values:
-						[ 
-							{ item_option_value:{item_id: products[0].item.id ,max_extra_qty:1,extra_price:0,price:0} }, 
-							{ item_option_value:{item_id: products[1].item.id ,max_extra_qty:1,extra_price:0,price:0} }, 
+						[
+							{ item_option_value:{item_id: products[0].item.id ,max_extra_qty:1,extra_price:0,price:0} },
+							{ item_option_value:{item_id: products[1].item.id ,max_extra_qty:1,extra_price:0,price:0} },
 							{ item_option_value:{item_id: products[2].item.id ,max_extra_qty:1,extra_price:0,price:0} }
 						],
 						item_option:{"name":"Opcion",included_options:1,included_extra_qty:1,max_extra_qty:1,max_options:1}
@@ -211,7 +276,6 @@ QUnit.module('Sell', function()
 	{
 		assert.ok(true, 'Payment Accpeted');
 	});
-
 });
 
 

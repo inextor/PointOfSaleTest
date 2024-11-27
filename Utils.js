@@ -4,9 +4,9 @@ let referrer = 'http://127.0.0.1';
 function doGet(path,bearer)
 {
 	let headers =  {
-	    "accept": "application/json, text/plain, */*",
-	    "content-type": "application/json",
-	  }
+	   "accept": "application/json, text/plain, */*",
+	   "content-type": "application/json",
+	 }
 
 	if( bearer )
 	{
@@ -44,9 +44,9 @@ function doGet(path,bearer)
 function doPost(path, body, bearer)
 {
 	let headers =  {
-	    "accept": "application/json, text/plain, */*",
-	    "content-type": "application/json",
-	  }
+	   "accept": "application/json, text/plain, */*",
+	   "content-type": "application/json",
+	 }
 
 	if( bearer )
 	{
@@ -66,7 +66,11 @@ function doPost(path, body, bearer)
 	{
 		if( r.status >= 200 && r.status < 300 )
 		{
-			return r.json();
+			let size = r.headers.get('content-length');
+			if( size > 0 )
+				return r.json();
+			else
+				return Promise.resolve({});
 		}
 		else
 		{
@@ -107,13 +111,16 @@ function login(user_type)
 	});
 }
 
-function getItem(bearer)
+function getItem(bearer,stock_type, qty, store_id)
 {
+	if( stock_type == undefined )
+		stock_type = 'ALWAYS';
+
 	return doPost('/item_info.php',
 		{
-			"item": 
+			"item":
 			{
-				"availability_type": "ALWAYS",
+				"availability_type": stock_type,
 				"clave_sat": "53111603",
 				"name": "Item Test "+Date.now(),
 				"note_required": "NO",
@@ -126,6 +133,33 @@ function getItem(bearer)
 	)
 	.then((response)=>
 	{
+		if( stock_type == 'ON_STOCK' && qty !== undefined )
+		{
+			console.log('Agregando stock');
+			let object = {
+				"method":"adjustStock",
+				"stock_records":[{
+					"store_id": store_id,
+					"qty": 6,
+					"item_id": response.result.item.id,
+				}]
+			};
+
+			console.log("Funciona todavia aqui");
+
+			return doPost('/updates.php', object, bearer)
+			.then((_response)=>
+			{
+				console.log("termino, asi que veremos que fallo");
+				return response.result.item.id;
+			})
+			.catch((error)=>{
+
+				console.log('Fallo la actualizar el inventario', error);
+				throw error;
+			});
+		}
+
 		return response.result.item.id;
 	});
 }
@@ -134,5 +168,3 @@ function hasPassword(obj)
 {
 	return false;
 }
-
-

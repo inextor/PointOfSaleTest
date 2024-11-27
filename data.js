@@ -5,6 +5,7 @@ function getOrderItemWithPrimes(item_ids)
 		        "currency_id": "MXN",   
 		        "marked_for_billing": null, "note": null, "paid_status": null, "paid_timetamp": null, "price_type_id": 2,
 		        "service_type": "QUICK_SALE", "status": "PENDING", "store_id": 1, 
+				"sync_id": "1-"+Date.now(),
 				//"subtotal": 1378.867, "tax": 1.1030936, "tax_percent": 8, "total": 1379.9700936, "discount": 0,
 				"subtotal": 0, "tax": 0, "tax_percent": 8, "total": 0, "discount": 0,
 		},
