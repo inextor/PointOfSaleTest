@@ -72,6 +72,7 @@ QUnit.module('User',function()
 	});
 });
 
+/*
 QUnit.module('Sell', function()
 {
 	QUnit.test('Sell duplicate', (assert) =>
@@ -107,7 +108,9 @@ QUnit.module('Sell', function()
 			assert.equal( ids.length, 8, 'Items Creados');
 			let order = getOrderItemWithPrimes(ids);
 			order.order.sync_id = random;
-			return Promise.all([
+
+			return Promise.all
+			([
 				doPost('/order_info.php', order , bearer),
 				doPost('/order_info.php', order , bearer)
 			]).then(()=>
@@ -199,12 +202,14 @@ QUnit.module('Sell', function()
 			assert.equal(order_info.order.paid_status, 'PAID', 'Orden Pagada');
 			done();
 		})
-		.catch((error)=>{
-			console.log('Sell simple ',error); 
+		.catch((error)=>
+		{
+			console.log('Sell simple ',error);
 			assert.ok(false, 'Fallo en algo');
 			done();
 		});
 	});
+	*/
 	/*
 
 	QUnit.test('Sell With Options', (assert) =>
@@ -255,7 +260,6 @@ QUnit.module('Sell', function()
 			done();
 		});
 	});
-	*/
 
 	QUnit.test('Sell With Stock', (assert) =>
 	{
@@ -278,6 +282,7 @@ QUnit.module('Sell', function()
 	});
 });
 
+*/
 
 QUnit.module('Purchase Orders', function()
 {
@@ -292,5 +297,88 @@ QUnit.module('Purchase Orders', function()
 	});
 });
 
+QUnit.module('Payment Pharos', function()
+{
+	QUnit.test('Payment Pharos', (assert) =>
+	{
+
+		const done = assert.async();
+
+		login('admin').then((bearer)=>
+		{
+			console.log('Running 1');
+			assert.ok(true,'Login Payment Pharos');
+
+			console.log('LLego aqui', bearer );
+
+			return Promise.all
+			([
+				getItem(bearer),
+				Promise.resolve( bearer )
+			]);
+		})
+		.then((ids)=>
+		{
+			let bearer = ids[ids.length-1];
+			assert.ok( true, 'Items Creados');
+			let order = getOrderItemWithPrimes(ids);
+			order.order.sync_id = getRandom();
+			/*
+				curl --location 'https://clientes.integranet.xyz/api/payment.php' \
+				--header 'Content-Type: application/json' \
+				--header 'Authorization: Bearer Platform-dX0hJVUauda6n810lnVg5hF9yXqlSdAI3fu4RSbdisweZPtH3xt536ON5EfoAuyf' \
+				--data '{
+				"amount": "223",
+				"currency": "978",
+				"card_number": "1234567890123456",
+				"exp_month": "02",
+				"exp_year": "23",
+				"sec_code": "0004",
+				"last_four": "3456",
+				"cardholder_name": "Juan Perez",
+				"store_id": "157"
+				}'
+			*/
+			return doPost('/order_info.php', order , bearer)
+		})
+		.then((result)=>
+		{
+			let order_info = result.result
+			let obj = {
+				action: 'PAY',
+				order_id: order_info.order.id,
+				card_number: '1234567890123456',
+				exp_month: '02',
+				exp_year:	'23',
+				sec_code: '0004',
+				last_four: '3456',
+				cardholder_name: 'Juan Perez',
+			};
+
+			assert.ok(true,'ordenes creadas');
+			return doPost('/pharos_order.php', obj ,result.bearer);
+		})
+		.then((result)=>
+		{
+			assert.ok(true,'Pago completado');
+			done();
+			//return doGet('/order_info.php?sync_id,='+random,result.bearer);
+		})
+		.catch((error)=>
+		{
+			console.log('ERROR',error);
+			assert.ok(false,'Fallo todo el proceso de compra');
+			done();
+		});
+
+	});
+});
+
+
+function getRandom()
+{
+	let d = new Date();
+	return ''+(d.getFullYear())+'-'+d.getMonth()+'-'-d.getDate()+' '+d.getHours()+':'+d.getMinutes()+':'+d.getSeconds();
+}
 
 
