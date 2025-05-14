@@ -72,7 +72,6 @@ QUnit.module('User',function()
 	});
 });
 
-/*
 QUnit.module('Sell', function()
 {
 	QUnit.test('Sell duplicate', (assert) =>
@@ -209,8 +208,6 @@ QUnit.module('Sell', function()
 			done();
 		});
 	});
-	*/
-	/*
 
 	QUnit.test('Sell With Options', (assert) =>
 	{
@@ -229,7 +226,7 @@ QUnit.module('Sell', function()
 		})
 		.then((response)=>
 		{
-			let products = response.results;
+			let products = response.result;
 
 			assert.ok(true, 'Creacion Articulos de opciones');
 
@@ -282,7 +279,6 @@ QUnit.module('Sell', function()
 	});
 });
 
-*/
 
 QUnit.module('Purchase Orders', function()
 {
@@ -301,7 +297,6 @@ QUnit.module('Payment Pharos', function()
 {
 	QUnit.test('Payment Pharos', (assert) =>
 	{
-
 		const done = assert.async();
 
 		login('admin').then((bearer)=>
@@ -320,9 +315,42 @@ QUnit.module('Payment Pharos', function()
 		.then((ids)=>
 		{
 			let bearer = ids[ids.length-1];
-			assert.ok( true, 'Items Creados');
-			let order = getOrderItemWithPrimes(ids);
+
+			assert.ok( true, 'Articulos creados');
+
+			return promiseObject
+			({
+				"item_id": ids[0],
+				"client": getNewClientP(bearer),
+				"bearer": bearer
+			});
+		})
+		.then((response)=>
+		{
+			let client = response.client.result;
+
+			assert.ok( true, 'Usuario creado');
+			return promiseObject
+			({
+				"item_id": response.item_id,
+				"client": client,
+				"bearer": response.bearer,
+				"address": getNewAdressP(client.id,response.bearer)
+			});
+		})
+		.then((response)=>
+		{
+			let bearer = response.bearer;
+
+			assert.ok( true, 'Direccion creada');
+
+			let order = getOrderItemWithPrimes([response.item_id]);
 			order.order.sync_id = getRandom();
+			order.order.client_user_id = response.client.id;
+			order.order.shipping_address_id = response.address.result.id;
+			order.order.address = response.address.result.address;
+			order.order.service_type = 'TOGO';
+
 			/*
 				curl --location 'https://clientes.integranet.xyz/api/payment.php' \
 				--header 'Content-Type: application/json' \
@@ -370,9 +398,10 @@ QUnit.module('Payment Pharos', function()
 			assert.ok(false,'Fallo todo el proceso de compra');
 			done();
 		});
-
 	});
 });
+
+
 
 
 function getRandom()
@@ -380,5 +409,3 @@ function getRandom()
 	let d = new Date();
 	return ''+(d.getFullYear())+'-'+d.getMonth()+'-'-d.getDate()+' '+d.getHours()+':'+d.getMinutes()+':'+d.getSeconds();
 }
-
-

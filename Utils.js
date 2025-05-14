@@ -1,5 +1,5 @@
-let end_point = 'http://127.0.0.1/PointOfSale'
-let referrer = 'http://127.0.0.1';
+let end_point = 'https://test.integranet.xyz/api'
+//let referrer = 'http://test.integranet.xyz';
 
 function doGet(path,bearer)
 {
@@ -15,11 +15,11 @@ function doGet(path,bearer)
 
 	return fetch(end_point+path, {
 		"headers": headers,
-		"referrer": end_point,
+	//	"referrer": end_point,
 		"referrerPolicy": "strict-origin-when-cross-origin",
 		"method": "GET",
 		"mode": "cors",
-		"credentials": "omit"
+		"credentials": "include"
 	})
 	.then((r)=>
 	{
@@ -39,7 +39,60 @@ function doGet(path,bearer)
 	});
 }
 
+function getNewClientP(bearer)
+{
+	let client = {
+		"birthday": null,
+		"created": null,
+		"created_by_store_id": null,
+		"created_by_user_id": 2,
+		"creation_store_id": "1",
+		"credit_days": 0,
+		"credit_limit": 0,
+		"default_billing_address_id": null,
+		"default_shipping_address_id": null,
+		"id": 0,
+		"image_id": null,
+		"lat": null,
+		"lng": null,
+		"name": "ClienteXXXXXXXX",
+		"payment_address_id": null,
+		"payment_option": "STORE",
+		"platform_client_id": null,
+		"points": 0,
+		"preferred_store_id": null,
+		"price_type_id": "1",
+		"production_area_id": null,
+		"status": "ACTIVE",
+		"store_id": null,
+		"type": "CLIENT",
+		"updated": null,
+		"updated_by_user_id": null,
+		"workshift_id": null
+	};
 
+	return doPost('/user.php', client, bearer);
+}
+
+function getNewAdressP(client_id,bearer)
+{
+	console.log('Creando nueva address');
+	let address = {
+		"name": "Carlos Collado EDITADO",
+		"sat_regimen_capital": "",
+		"sat_regimen_fiscal": "",
+		"type": "SHIPPING",
+		"address": "asdfasdf",
+		"zipcode": "22800",
+		"email": "",
+		"rfc": "",
+		"user_id": client_id,
+		"lat": 31.86053689098042,
+		"lng": -116.60505248383286
+	};
+
+	return doPost('/address.php', address, bearer );
+}
 
 function doPost(path, body, bearer)
 {
@@ -103,10 +156,12 @@ function login(user_type)
 
 	return doPost('/login.php',
 	{
-			"username": "admin",
-			"password": "asdf"
-	}).then((data)=>
+		"username": "admin",
+		"password": "asdf"
+	})
+	.then((data)=>
 	{
+		console.log('LOGIN HEEEEEEEE');
 		return data.result.session.id;
 	});
 }
@@ -116,7 +171,9 @@ function getItem(bearer,stock_type, qty, store_id)
 	if( stock_type == undefined )
 		stock_type = 'ALWAYS';
 
-	return doPost('/item_info.php',
+	return doPost
+	(
+		'/item_info.php',
 		{
 			"item":
 			{
@@ -129,7 +186,8 @@ function getItem(bearer,stock_type, qty, store_id)
 				"status": "ACTIVE",
 				"unidad_medida_sat_id": "H87",
 			},
-		},bearer
+		},
+		bearer
 	)
 	.then((response)=>
 	{
@@ -150,17 +208,41 @@ function getItem(bearer,stock_type, qty, store_id)
 			return doPost('/updates.php', object, bearer)
 			.then((_response)=>
 			{
-				console.log("termino, asi que veremos que fallo");
 				return response.result.item.id;
 			})
-			.catch((error)=>{
+			.then((fooo)=>{
+				assert.ok(true,'TOOO bien');
+			})
+			//.catch((error)=>{
 
-				console.log('Fallo la actualizar el inventario', error);
-				throw error;
-			});
+			//	console.log('Fallo la actualizar el inventario', error);
+			//	throw error;
+			//});
 		}
 
 		return response.result.item.id;
+	});
+}
+
+function promiseObject(obj)
+{
+	const keys = Object.keys(obj);
+	const promises = keys.map((key) =>
+	{
+		if( obj[key] instanceof Promise )
+			return obj[key];
+
+		return Promise.resolve(obj[key])
+	});
+
+	return Promise.all(promises).then(values =>
+	{
+		const result = {};
+		for (let i = 0; i < values.length; i++)
+		{
+			result[keys[i]] = values[i];
+		}
+		return result;
 	});
 }
 
