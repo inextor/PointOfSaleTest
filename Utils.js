@@ -166,6 +166,33 @@ function login(user_type)
 	});
 }
 
+function getItemWithCommanda(bearer, commanda_type_id, assert)
+{
+	return doPost
+	(
+		'/item_info.php',
+		{
+			"item":
+			{
+				"availability_type":'ALWAYS',
+				"clave_sat": "53111603",
+				"name": "Item Test "+Date.now(),
+				"note_required": "NO",
+				"on_sale": "NO",
+				"reference_price": 0,
+				"status": "ACTIVE",
+				"unidad_medida_sat_id": "H87",
+				"commanda_type_id": commanda_type_id
+			},
+		},
+		bearer
+	)
+	.then((response)=>
+	{
+		return response.result.item.id;
+	});
+}
+
 function getItem(bearer,stock_type, qty, store_id)
 {
 	if( stock_type == undefined )
@@ -211,7 +238,7 @@ function getItem(bearer,stock_type, qty, store_id)
 				return response.result.item.id;
 			})
 			.then((fooo)=>{
-				assert.ok(true,'TOOO bien');
+				//assert.ok(true,'TOOO bien');
 			})
 			//.catch((error)=>{
 

@@ -304,35 +304,22 @@ QUnit.module('Payment Pharos', function()
 			console.log('Running 1');
 			assert.ok(true,'Login Payment Pharos');
 
-			console.log('LLego aqui', bearer );
-
-			return Promise.all
-			([
-				getItem(bearer),
-				Promise.resolve( bearer )
-			]);
-		})
-		.then((ids)=>
-		{
-			let bearer = ids[ids.length-1];
-
-			assert.ok( true, 'Articulos creados');
-
 			return promiseObject
 			({
-				"item_id": ids[0],
+				"item_1": getItem(bearer),
+				"item_2": getItemWithCommanda(bearer,1),
 				"client": getNewClientP(bearer),
 				"bearer": bearer
 			});
 		})
-		.then((response)=>
-		{
+		.then((response)=>{
 			let client = response.client.result;
 
 			assert.ok( true, 'Usuario creado');
 			return promiseObject
 			({
-				"item_id": response.item_id,
+				"item_1": response.item_1,
+				"item_2": response.item_2,
 				"client": client,
 				"bearer": response.bearer,
 				"address": getNewAdressP(client.id,response.bearer)
@@ -344,7 +331,7 @@ QUnit.module('Payment Pharos', function()
 
 			assert.ok( true, 'Direccion creada');
 
-			let order = getOrderItemWithPrimes([response.item_id]);
+			let order = getOrderItemWithPrimes([response.item_1, response.item_2]);
 			order.order.sync_id = getRandom();
 			order.order.client_user_id = response.client.id;
 			order.order.shipping_address_id = response.address.result.id;

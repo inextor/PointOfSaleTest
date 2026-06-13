@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Delivered Consignment Smoke Test</title>
+		<style>
+			body {
+				font-family: Arial, sans-serif;
+				margin: 24px;
+				color: #1f2933;
+			}
+			label {
+				display: block;
+				margin: 12px 0 4px;
+				font-weight: 600;
+			}
+			input {
+				width: min(560px, 100%);
+				padding: 8px;
+				border: 1px solid #b8c2cc;
+				border-radius: 4px;
+			}
+			button {
+				margin-top: 16px;
+				padding: 9px 14px;
+				border: 1px solid #1f2933;
+				border-radius: 4px;
+				background: #1f2933;
+				color: white;
+				cursor: pointer;
+			}
+			button:disabled {
+				opacity: 0.6;
+				cursor: default;
+			}
+			#status {
+				margin-top: 18px;
+				font-weight: 700;
+			}
+			#log {
+				margin-top: 16px;
+				padding: 12px;
+				min-height: 280px;
+				white-space: pre-wrap;
+				background: #101820;
+				color: #e6edf3;
+				border-radius: 4px;
+				font-family: Consolas, Monaco, monospace;
+				font-size: 13px;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Delivered Consignment Smoke Test</h1>
+
+		<label for="endpoint">API endpoint</label>
+		<input id="endpoint" value="https://test.integranet.xyz/api">
+
+		<label for="username">Username</label>
+		<input id="username" value="nextor">
+
+		<label for="password">Password</label>
+		<input id="password" value="sdfgsdfggggggg" type="password">
+
+		<button id="run">Run Test</button>
+
+		<div id="status">Idle</div>
+		<pre id="log"></pre>
+
+		<script>
+			const config = {
+				itemName: 'consigna delivered',
+				storeId: 1,
+				deliveredQty: 3,
+				soldQty: 2,
+				returnedQty: 1,
+				unitaryPrice: 25
+			};
+
+			const button = document.getElementById('run');
+			const statusEl = document.getElementById('status');
+			const logEl = document.getElementById('log');
+
+			function log(message, value) {
+				const suffix = value === undefined ? '' : ' ' + JSON.stringify(value, null, 2);
+				logEl.textContent += message + suffix + '\n';
+			}
+
+			function endpoint() {
+				return document.getElementById('endpoint').value.replace(/\/$/, '');
+			}
+
+				async function request(path, options) {
+					options = options || {};
+					const headers = {
+						accept: 'application/json, text/plain, */*'
+					};
+
+					if (options.body !== undefined) {
+						headers['content-type'] = 'application/json';
+					}
+
+					if (options.bearer) {
+						headers.Authorization = 'Bearer ' + options.bearer;
+					}
+
+				const response = await fetch(endpoint() + path, {
+					method: options.method || 'GET',
+					headers,
+					body: options.body === undefined ? undefined : JSON.stringify(options.body),
+					mode: 'cors',
+					credentials: 'omit'
+				});
+
+				const text = await response.text();
+				let data = {};
+
+				if (text.trim() !== '') {
+					data = JSON.parse(text);
+				}
+
+				if (!response.ok) {
+					throw new Error((options.method || 'GET') + ' ' + path + ' failed ' + response.status + ': ' + JSON.stringify(data));
+				}
+
+				return data;
+			}
+
+			async function login() {
+				const data = await request('/login.php', {
+					method: 'POST',
+					body: {
+						username: document.getElementById('username').value,
+						password: document.getElementById('password').value
+					}
+				});
+
+				if (!data.session || !data.session.id) {
+					throw new Error('Login response did not include session.id');
+				}
+
+				return data.session.id;
+			}
+
+			async function getCurrentUser(bearer) {
+				const user = await request('/user.php?me=1', { bearer });
+
+				if (!user.id) {
+					throw new Error('Could not load current user');
+				}
+
+				return user;
+			}
+
+			async function findOrCreateItem(bearer) {
+				const found = await request('/item_info.php?name=' + encodeURIComponent(config.itemName), { bearer });
+				const existing = found.data && found.data.find((row) => row.item && row.item.name === config.itemName);
+
+				if (existing) {
+					return existing.item.id;
+				}
+
+				const created = await request('/item_info.php', {
+					method: 'POST',
+					bearer,
+					body: {
+						item: {
+							applicable_tax: 'DEFAULT',
+							availability_type: 'ON_STOCK',
+							clave_sat: '53111603',
+							currency_id: 'MXN',
+							name: config.itemName,
+							note_required: 'NO',
+							on_sale: 'YES',
+							reference_price: 0,
+							status: 'ACTIVE',
+							unidad_medida_sat_id: 'H87'
+						}
+					}
+				});
+
+				if (!created.item || !created.item.id) {
+					throw new Error('Item creation response did not include item.id');
+				}
+
+				return created.item.id;
+			}
+
+			async function adjustStock(itemId, bearer) {
+				await request('/updates.php', {
+					method: 'POST',
+					bearer,
+					body: {
+						method: 'adjustStock',
+						stock_records: [
+							{
+								store_id: config.storeId,
+								qty: 20,
+								item_id: itemId
+							}
+						]
+					}
+				});
+			}
+
+			async function createDeliveredConsignment(itemId, sellerUserId, bearer) {
+				const data = await request('/consignment_delivered_info.php', {
+					method: 'POST',
+					bearer,
+					body: {
+						consignment_delivered: {
+							seller_user_id: sellerUserId,
+							store_id: config.storeId
+						},
+						items: [
+							{
+								consignment_delivered_item: {
+									item_id: itemId,
+									qty: config.deliveredQty,
+									unitary_price: config.unitaryPrice
+								}
+							}
+						]
+					}
+				});
+
+				const consignmentId = data.consignment_delivered && data.consignment_delivered.id;
+				const consignmentItemId = data.items && data.items[0] && data.items[0].consignment_delivered_item.id;
+
+				if (!consignmentId || !consignmentItemId) {
+					throw new Error('Delivered consignment creation response did not include expected ids');
+				}
+
+				return { consignmentId, consignmentItemId };
+			}
+
+			async function settleDeliveredConsignment(consignmentId, consignmentItemId, bearer) {
+				const data = await request('/updates/consignment_delivered_settle.php', {
+					method: 'POST',
+					bearer,
+					body: {
+						consignment_delivered_id: consignmentId,
+						return_items: [
+							{
+								id: consignmentItemId,
+								returned_qty: config.returnedQty,
+								sold_qty: config.soldQty
+							}
+						]
+					}
+				});
+
+				if (data.status !== 'SETTLED') {
+					throw new Error('Consignment did not settle. Response: ' + JSON.stringify(data));
+				}
+			}
+
+			async function assertGeneratedOrder(consignmentId, bearer) {
+				const data = await request('/order_info.php?consignment_delivered_id=' + consignmentId, { bearer });
+
+				if (!data.data || data.data.length !== 1) {
+					throw new Error('Expected one generated order, got: ' + JSON.stringify(data));
+				}
+
+				const order = data.data[0].order;
+				const expectedTotal = config.soldQty * config.unitaryPrice;
+
+				if (Number(order.total) !== expectedTotal) {
+					throw new Error('Expected order total ' + expectedTotal + ', got ' + order.total);
+				}
+
+				if (order.status !== 'CLOSED' || order.delivery_status !== 'DELIVERED') {
+					throw new Error('Generated order has wrong status: ' + JSON.stringify(order));
+				}
+
+				return order;
+			}
+
+			async function run() {
+				button.disabled = true;
+				logEl.textContent = '';
+				statusEl.textContent = 'Running';
+
+				try {
+					log('Endpoint:', endpoint());
+
+					const bearer = await login();
+					log('Logged in');
+
+					const user = await getCurrentUser(bearer);
+					log('User:', { id: user.id, name: user.name || user.username || null });
+
+					const itemId = await findOrCreateItem(bearer);
+					log('Item:', { id: itemId, name: config.itemName });
+
+					await adjustStock(itemId, bearer);
+					log('Stock adjusted');
+
+					const ids = await createDeliveredConsignment(itemId, user.id, bearer);
+					log('Delivered consignment:', ids);
+
+					await settleDeliveredConsignment(ids.consignmentId, ids.consignmentItemId, bearer);
+					log('Consignment settled');
+
+					const order = await assertGeneratedOrder(ids.consignmentId, bearer);
+					log('Generated order:', { id: order.id, total: order.total, status: order.status, delivery_status: order.delivery_status });
+
+					statusEl.textContent = 'PASS';
+				} catch (error) {
+					console.error(error);
+					log('FAIL:', error.stack || error.message || error);
+					statusEl.textContent = 'FAIL';
+				} finally {
+					button.disabled = false;
+				}
+			}
+
+			button.addEventListener('click', run);
+		</script>
+	</body>
+</html>
