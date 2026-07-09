@@ -565,16 +565,19 @@ async function createBackendSaleItems(bearer) {
 
 async function resolveBankAccountForTest(session, storeId) {
 	var accounts = await apiRequest(
-		'/bank_account.php?_sort=id_DESC&limit=1',
+		'/bank_account.php?_sort=id_DESC',
 		{ bearer: session.bearer }
 	);
 	var rows = accounts.data || accounts.result || [];
 	var totalAccounts = accounts.total || rows.length;
 
-	if (totalAccounts > 5) {
+	if (totalAccounts > 5 && rows.length > 0) {
 		var ba = rows[0].bank_account || rows[0];
+		console.log('resolveBankAccountForTest: ' + totalAccounts + ' total, reusing id=' + ba.id);
 		return ba.id;
 	}
+
+	console.log('resolveBankAccountForTest: ' + totalAccounts + ' total, creating new');
 	var created = await apiRequest('/bank_account.php', {
 		method: 'POST',
 		bearer: session.bearer,
