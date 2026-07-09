@@ -5,9 +5,12 @@ async function resolveOrCreateBankAccount(session, storeId) {
 		'/store_bank_account.php?store_id=' + storeId,
 		{ bearer: session.bearer }
 	);
-	const rows = existing.data || existing.result || [];
-	if (rows.length > 0) {
-		const sba = rows[0].store_bank_account || rows[0];
+	const sbaRows = existing.data || existing.result || [];
+	console.log('store_bank_account lookup: total=' + (existing.total || '?') + ' rows=' + sbaRows.length + ' data=' + JSON.stringify(existing).slice(0, 200));
+
+	if (sbaRows.length > 0) {
+		const sba = sbaRows[0].store_bank_account || sbaRows[0];
+		console.log('reusing existing store_bank_account id=' + sba.id + ' bank_account_id=' + sba.bank_account_id);
 		return {
 			bankAccountId: sba.bank_account_id,
 			storeBankAccountId: sba.id
@@ -20,12 +23,20 @@ async function resolveOrCreateBankAccount(session, storeId) {
 	);
 	const accountRows = accounts.data || accounts.result || [];
 	const totalAccounts = accounts.total || accountRows.length;
+	console.log('bank_account list: total=' + totalAccounts + ' page_rows=' + accountRows.length);
 
 	var bankAccountId;
 	if (totalAccounts > 5) {
-		var ba = accountRows[0].bank_account || accountRows[0];
+		var ba = accountRows[0];
+		if (ba && ba.bank_account) ba = ba.bank_account;
+		if (!ba || !ba.id) {
+			console.log('ERROR: could not extract id from first bank_account row', accountRows[0]);
+			throw new Error('Could not find biggest bank_account id');
+		}
 		bankAccountId = ba.id;
+		console.log('>5 bank_accounts, reusing biggest id=' + bankAccountId);
 	} else {
+		console.log('<=5 bank_accounts, creating new one');
 		const bankAccount = await apiRequest('/bank_account.php', {
 			method: 'POST',
 			bearer: session.bearer,
@@ -40,8 +51,10 @@ async function resolveOrCreateBankAccount(session, storeId) {
 			}
 		});
 		bankAccountId = (bankAccount && bankAccount.bank_account) ? bankAccount.bank_account.id : bankAccount.id;
+		console.log('created bank_account id=' + bankAccountId);
 	}
 
+	console.log('creating store_bank_account link: store_id=' + storeId + ' bank_account_id=' + bankAccountId);
 	const storeBank = await apiRequest('/store_bank_account.php', {
 		method: 'POST',
 		bearer: session.bearer,
@@ -53,6 +66,7 @@ async function resolveOrCreateBankAccount(session, storeId) {
 		}
 	});
 	const sbaId = (storeBank && storeBank.store_bank_account) ? storeBank.store_bank_account.id : storeBank.id;
+	console.log('store_bank_account link created: id=' + sbaId + ' response=' + JSON.stringify(storeBank).slice(0, 200));
 
 	return { bankAccountId, storeBankAccountId: sbaId };
 }
