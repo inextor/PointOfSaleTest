@@ -1,35 +1,47 @@
 QUnit.module('bank_movement assignment to bank_account');
 
-async function findOrCreateStore(session) {
-	const stores = await apiRequest('/store.php', { bearer: session.bearer });
-	const list = stores.data || stores.result || [];
-	if (list.length > 0) {
-		const store = list[0].store || list[0];
-		return store.id;
+async function resolveOrCreateBankAccount(session, storeId) {
+	const existing = await apiRequest(
+		'/store_bank_account.php?store_id=' + storeId,
+		{ bearer: session.bearer }
+	);
+	const rows = existing.data || existing.result || [];
+	if (rows.length > 0) {
+		const sba = rows[0].store_bank_account || rows[0];
+		return {
+			bankAccountId: sba.bank_account_id,
+			storeBankAccountId: sba.id
+		};
 	}
-	throw new Error('No stores available');
-}
 
-async function cleanupStoreBankAccount(bearer, id, storeId, bankAccountId) {
-	try {
-		await apiRequest('/store_bank_account.php', {
-			method: 'DELETE',
-			bearer: bearer,
-			body: { id: id }
-		});
-		return true;
-	} catch (e) {
-		try {
-			await apiRequest('/store_bank_account.php', {
-				method: 'PUT',
-				bearer: bearer,
-				body: { id: id, store_id: storeId, bank_account_id: bankAccountId, status: 'DELETED' }
-			});
-			return true;
-		} catch (e2) {
-			return false;
+	const bankAccount = await apiRequest('/bank_account.php', {
+		method: 'POST',
+		bearer: session.bearer,
+		body: {
+			name: uniqueName('ba-cash'),
+			alias: uniqueName('cash'),
+			bank: 'TB',
+			account: 'ACC' + Date.now(),
+			store_id: storeId,
+			currency: 'MXN',
+			status: 'ACTIVE'
 		}
-	}
+	});
+	const bankAccountId = (bankAccount && bankAccount.bank_account) ? bankAccount.bank_account.id : bankAccount.id;
+
+	const storeBank = await apiRequest('/store_bank_account.php', {
+		method: 'POST',
+		bearer: session.bearer,
+		body: {
+			name: uniqueName('sba-cash'),
+			store_id: storeId,
+			bank_account_id: bankAccountId,
+			default_transaction_type: 'CASH'
+		}
+	});
+	const sbaId = (storeBank && storeBank.store_bank_account) ? storeBank.store_bank_account.id : storeBank.id;
+
+	return { bankAccountId, storeBankAccountId: sbaId };
 }
 
 QUnit.test('auto-assign bank_account via store_bank_account on payment', async function(assert) {
@@ -41,34 +53,8 @@ QUnit.test('auto-assign bank_account via store_bank_account on payment', async f
 	const storeId = session.user.store_id || testConfig.storeId;
 	assert.ok(storeId, 'have store id: ' + storeId);
 
-	const bankAccount = await apiRequest('/bank_account.php', {
-		method: 'POST',
-		bearer: session.bearer,
-		body: {
-			name: uniqueName('ba-payment'),
-			alias: uniqueName('ba'),
-			bank: 'TB',
-			account: 'ACC' + Date.now(),
-			store_id: storeId,
-			currency: 'MXN',
-			status: 'ACTIVE'
-		}
-	});
-	const bankAccountId = (bankAccount && bankAccount.bank_account) ? bankAccount.bank_account.id : bankAccount.id;
-	assert.ok(bankAccountId, 'created bank_account id=' + bankAccountId);
-
-	const storeBank = await apiRequest('/store_bank_account.php', {
-		method: 'POST',
-		bearer: session.bearer,
-		body: {
-			name: uniqueName('sba-auto'),
-			store_id: storeId,
-			bank_account_id: bankAccountId,
-			default_transaction_type: 'CASH'
-		}
-	});
-	const sbaId = (storeBank && storeBank.store_bank_account) ? storeBank.store_bank_account.id : storeBank.id;
-	assert.ok(sbaId, 'created store_bank_account id=' + sbaId);
+	const { bankAccountId } = await resolveOrCreateBankAccount(session, storeId);
+	assert.ok(bankAccountId, 'have bank_account id=' + bankAccountId);
 
 	const itemIds = await createBackendSaleItems(session.bearer);
 	assert.equal(itemIds.length, 7, 'items created');
@@ -95,7 +81,7 @@ QUnit.test('auto-assign bank_account via store_bank_account on payment', async f
 	assert.equal(
 		Number(bankMovement.bank_account_id),
 		Number(bankAccountId),
-		'bank_movement.bank_account_id matches created bank_account'
+		'bank_movement.bank_account_id matches store_bank_account'
 	);
 
 	const paidOrderId = paymentInfo.movements[0].bank_movement_orders[0].order_id;
@@ -103,9 +89,6 @@ QUnit.test('auto-assign bank_account via store_bank_account on payment', async f
 
 	const reloadedOrder = await apiRequest('/order_info.php?id=' + encodeURIComponent(paidOrderId), { bearer: session.bearer });
 	assert.equal(reloadedOrder.order.paid_status, 'PAID', 'order paid');
-
-	const cleaned = await cleanupStoreBankAccount(session.bearer, sbaId, storeId, bankAccountId);
-	assert.ok(cleaned, 'cleaned up store_bank_account');
 });
 
 QUnit.test('explicit bank_account_id in bank_movement payload', async function(assert) {
@@ -115,22 +98,8 @@ QUnit.test('explicit bank_account_id in bank_movement payload', async function(a
 	assert.ok(session.bearer, 'logged in');
 
 	const storeId = session.user.store_id || testConfig.storeId;
-
-	const bankAccount = await apiRequest('/bank_account.php', {
-		method: 'POST',
-		bearer: session.bearer,
-		body: {
-			name: uniqueName('ba-explicit'),
-			alias: uniqueName('bae'),
-			bank: 'TB',
-			account: 'ACC' + Date.now(),
-			store_id: storeId,
-			currency: 'MXN',
-			status: 'ACTIVE'
-		}
-	});
-	const bankAccountId = (bankAccount && bankAccount.bank_account) ? bankAccount.bank_account.id : bankAccount.id;
-	assert.ok(bankAccountId, 'created bank_account id=' + bankAccountId);
+	const { bankAccountId } = await resolveOrCreateBankAccount(session, storeId);
+	assert.ok(bankAccountId, 'have bank_account id=' + bankAccountId);
 
 	const itemIds = await createBackendSaleItems(session.bearer);
 	assert.equal(itemIds.length, 7, 'items created');
@@ -142,7 +111,6 @@ QUnit.test('explicit bank_account_id in bank_movement payload', async function(a
 	});
 	assert.ok(orderInfo.order && orderInfo.order.id, 'order created');
 
-	// Build payment payload with explicit bank_account_id in bank_movement
 	var explicitPayload = paymentPayload(orderInfo.order.id, orderInfo.order.total, session.user.id);
 	explicitPayload.movements[0].bank_movement.bank_account_id = bankAccountId;
 
@@ -159,7 +127,7 @@ QUnit.test('explicit bank_account_id in bank_movement payload', async function(a
 	assert.equal(
 		Number(bankMovement.bank_account_id),
 		Number(bankAccountId),
-		'bank_movement.bank_account_id matches explicitly provided bank_account'
+		'bank_movement.bank_account_id matches explicit value'
 	);
 
 	const paidOrderId = paymentInfo.movements[0].bank_movement_orders[0].order_id;
@@ -173,22 +141,8 @@ QUnit.test('bank_movement queryable via bank_movement.php GET', async function(a
 	assert.ok(session.bearer, 'logged in');
 
 	const storeId = session.user.store_id || testConfig.storeId;
-
-	const bankAccount = await apiRequest('/bank_account.php', {
-		method: 'POST',
-		bearer: session.bearer,
-		body: {
-			name: uniqueName('ba-query'),
-			alias: uniqueName('baq'),
-			bank: 'TB',
-			account: 'ACC' + Date.now(),
-			store_id: storeId,
-			currency: 'MXN',
-			status: 'ACTIVE'
-		}
-	});
-	const bankAccountId = (bankAccount && bankAccount.bank_account) ? bankAccount.bank_account.id : bankAccount.id;
-	assert.ok(bankAccountId, 'created bank_account id=' + bankAccountId);
+	const { bankAccountId } = await resolveOrCreateBankAccount(session, storeId);
+	assert.ok(bankAccountId, 'have bank_account id=' + bankAccountId);
 
 	const itemIds = await createBackendSaleItems(session.bearer);
 	const orderInfo = await apiRequest('/order_info.php', {
