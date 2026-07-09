@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Delivered Consignment - QUnit Tests</title>
+<link rel="stylesheet" href="../qunit/qunit-2.18.1.css">
+<style>
+body { font-family: Arial, sans-serif; margin: 16px; }
+.controls { margin: 0 0 16px; padding: 12px; border: 1px solid #c8d1dc; border-radius: 4px; }
+label { display: block; margin: 8px 0 4px; font-weight: 600; }
+input { width: min(560px, 100%); padding: 7px; }
+</style>
+</head>
+<body>
+<div class="controls">
+	<label for="endpoint">API endpoint</label>
+	<input id="endpoint">
+</div>
+<div id="qunit"></div>
+<div id="qunit-fixture"></div>
+<script src="../qunit/qunit-2.18.1.js"></script>
+<script src="../environment.js"></script>
+<script src="../test_utils.js"></script>
+<script>
+document.getElementById('endpoint').value = end_point;
+document.getElementById('endpoint').addEventListener('change', function() {
+	var val = this.value.trim().replace(/\/+$/, '');
+	if (val && !/^https?:\/\//i.test(val)) {
+		val = 'https://' + val;
+	}
+	end_point = val;
+});
+</script>
+<script src="consignment.js"></script>
+</body>
+</html>

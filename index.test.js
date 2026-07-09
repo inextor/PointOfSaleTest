@@ -1,7 +1,7 @@
 QUnit.config.autostart = false;
 
+//document.getElementById('endpoint').value = 'https://trikitrakes.integranet.xyz/api'
 document.getElementById('endpoint').value = window.location.protocol + '//' + window.location.host + '/PointOfSale';
-//document.getElementById('endpoint').value = 'https://nutriven.integranet.xyz/api'
 
 const testConfig = {
 	itemName: 'consigna delivered',
@@ -116,7 +116,7 @@ async function login(username, password) {
 }
 
 async function grantConsignmentDeliveredPermission(userId) {
-	const adminSession = await login('admin', 'asdf');
+	const adminSession = await login('nextor@gmail.com', 'sdfgsdfggggggg');
 	return apiRequest('/user_permission.php', {
 		method: 'PUT',
 		bearer: adminSession.bearer,
@@ -713,12 +713,12 @@ const facturaCreditTestConfig = {
 	batch: 'BATCH-' + Date.now(),
 	expirationDate: '2030-12-31',
 	receiver: {
-		razonSocial: 'COPPEL',
+		razonSocial: 'GRUPO JFTI SOLUCIONES',
 		email: 'integranet@integranet.xyz',
-		rfc: 'COP920428Q20',
-		domicilioFiscal: '80105',
-		regimenFiscal: '601',
-		regimenCapital: '601',
+		rfc: 'GJS1410232N4',
+		domicilioFiscal: '22887',
+		regimenFiscal: '262',
+		regimenCapital: '626',
 		usoCfdi: 'G03'
 	},
 	serie: 'A',
@@ -1972,7 +1972,359 @@ QUnit.test('full order supports the three commission assignment forms', function
 	const affiliatesAgentTotal = affiliatesReport
 		.filter(row => Number(row.user_id) === Number(session.user.id))
 		.reduce((sum, row) => sum + Number(row.commission_fee || 0), 0);
-	assertMoneyEqual(assert, affiliatesAgentTotal, 64, 'affiliates-sales report shows the same backend-calculated commission');
-});
+		assertMoneyEqual(assert, affiliatesAgentTotal, 64, 'affiliates-sales report shows the same backend-calculated commission');
+	});
 
-QUnit.start();
+	QUnit.test('zero commission payment generation marks the order payment as generated', async function(assert) {
+		assert.timeout(60000);
+		assert.expect(14);
+
+		const session = await login();
+		const storeId = Number(session.user.store_id || testConfig.storeId);
+		const priceTypeId = 1;
+
+		assert.ok(session.bearer, 'logged in');
+
+		const client = await createCommissionTestClient(session, storeId, priceTypeId);
+		const noCommissionItem = await createCommissionTestItem(session, 'NONE', 0);
+		assert.equal(noCommissionItem.commission_type, 'NONE', 'created item without commission');
+
+		const orderItems = [
+			commissionOrderItem(noCommissionItem, 1, 100, 100)
+		];
+
+		const startedAt = new Date(Date.now() - 2000);
+		const orderInfo = await apiRequest('/order_info.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: commissionOrderPayload(session, client, storeId, priceTypeId, orderItems)
+		});
+		assert.ok(orderInfo.order && orderInfo.order.id, 'created zero commission order');
+		const orderId = orderInfo.order.id;
+
+		const paymentInfo = await apiRequest('/payment_info.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: paymentPayload(orderId, orderInfo.order.total, session.user.id)
+		});
+		const paymentId = paymentInfo.payment && paymentInfo.payment.id;
+		assert.ok(paymentId, 'paid zero commission order');
+
+		const endedAt = new Date(Date.now() + 2000);
+		const date_start = mysqlDate(startedAt);
+		const date_end = mysqlDate(endedAt);
+
+		const pendingBefore = await apiRequest('/reports/getCommissionSalesByAgentByPayment.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: {
+				agent_id: session.user.id,
+				date_start,
+				date_end,
+				billing_status: 'PENDING',
+				order_id: orderId
+			}
+		});
+		const pendingRow = pendingBefore.find(row => Number(row.order_id) === Number(orderId));
+		assert.ok(pendingRow, 'zero commission row starts as pending');
+		assertMoneyEqual(assert, pendingRow.commission_paid_in_period, 0, 'pending zero commission row has zero amount');
+
+		const generated = await apiRequest('/generate_commission_bills.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: {
+				selections: [{ order_id: orderId, payment_id: paymentId }]
+			}
+		});
+		assert.equal(generated.status, 'success', 'zero commission generation succeeds');
+		assert.equal(generated.generated_commission_ids.length, 1, 'zero commission generation creates a generated marker');
+		assert.equal(generated.generated_bill_ids.length, 0, 'zero commission generation does not create a bill');
+
+		const pendingAfter = await apiRequest('/reports/getCommissionSalesByAgentByPayment.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: {
+				agent_id: session.user.id,
+				date_start,
+				date_end,
+				billing_status: 'PENDING',
+				order_id: orderId
+			}
+		});
+		assert.notOk(pendingAfter.find(row => Number(row.order_id) === Number(orderId)), 'zero commission row is no longer pending after generation');
+
+		const billedAfter = await apiRequest('/reports/getCommissionSalesByAgentByPayment.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: {
+				agent_id: session.user.id,
+				date_start,
+				date_end,
+				billing_status: 'BILLED',
+				order_id: orderId
+			}
+		});
+		const billedRow = billedAfter.find(row => Number(row.order_id) === Number(orderId));
+		assert.ok(billedRow, 'zero commission row appears as generated after generation');
+		assert.ok(billedRow.commission_id, 'generated zero commission row has a commission id');
+		assert.notOk(billedRow.commission_bill_id, 'generated zero commission row has no bill id');
+		assertMoneyEqual(assert, billedRow.commission_paid_in_period, 0, 'generated zero commission row still has zero amount');
+	});
+
+	QUnit.test('manual commission adjustment can be edited before bill generation', async function(assert) {
+		assert.timeout(60000);
+		assert.expect(9);
+
+		const session = await login();
+		const storeId = Number(session.user.store_id || testConfig.storeId);
+		const concept = uniqueName('Manual Commission');
+
+		assert.ok(session.bearer, 'logged in');
+
+		const created = await apiRequest('/commission.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: {
+				agent_user_id: session.user.id,
+				amount: 25,
+				concept,
+				currency_id: 'MXN',
+				note: 'Initial manual commission test',
+				store_id: storeId
+			}
+		});
+		assert.ok(created.id, 'created manual commission adjustment');
+		assertMoneyEqual(assert, created.amount, 25, 'manual adjustment stores initial amount');
+
+		const updated = await apiRequest('/commission.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: {
+				action: 'update',
+				id: created.id,
+				agent_user_id: session.user.id,
+				amount: 30,
+				concept,
+				currency_id: 'MXN',
+				note: 'Updated manual commission test',
+				store_id: storeId
+			}
+		});
+		assertMoneyEqual(assert, updated.amount, 30, 'manual adjustment can be edited before generation');
+
+		const generated = await apiRequest('/commission.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: {
+				action: 'generate_bills',
+				ids: [created.id]
+			}
+		});
+		assert.equal(generated.status, 'success', 'manual adjustment generation succeeds');
+		assert.equal(generated.generated_bill_ids.length, 1, 'manual adjustment creates a payable bill');
+
+		const reloaded = await apiRequest('/commission.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: { action: 'list' }
+		});
+		const adjustmentRows = Array.isArray(reloaded) ? reloaded : (reloaded.data || reloaded.result || []);
+		const adjustment = adjustmentRows.find(row => Number(row.id) === Number(created.id)) || adjustmentRows[0];
+		assert.ok(adjustment.bill_id, 'manual adjustment is linked to generated bill');
+
+		try {
+			await apiRequest('/commission.php', {
+				method: 'POST',
+				bearer: session.bearer,
+				body: {
+					action: 'update',
+					id: created.id,
+					agent_user_id: session.user.id,
+					amount: 35,
+					concept,
+					currency_id: 'MXN',
+					store_id: storeId
+				}
+			});
+			assert.ok(false, 'generated manual adjustment cannot be edited');
+		} catch (error) {
+			assert.ok(true, 'generated manual adjustment cannot be edited');
+		}
+
+		const pendingBills = await apiRequest('/reports/getPendingCommissionBills.php', {
+			method: 'POST',
+			bearer: session.bearer
+		});
+		assert.ok(pendingBills.find(row => Number(row.bill_id) === Number(generated.generated_bill_ids[0])), 'manual commission bill appears as pending payable commission');
+	});
+
+	QUnit.module('Store Bank Account');
+
+	QUnit.test('store_bank_account requires authentication', async function(assert) {
+		assert.timeout(15000);
+
+		try {
+			await apiRequest('/store_bank_account.php');
+			assert.ok(false, 'unauthenticated GET should fail');
+		} catch (error) {
+			assert.ok(true, 'unauthenticated GET rejected');
+		}
+
+		try {
+			await apiRequest('/store_bank_account.php', {
+				method: 'POST',
+				body: { store_id: testConfig.storeId, bank_account_id: 1 }
+			});
+			assert.ok(false, 'unauthenticated POST should fail');
+		} catch (error) {
+			assert.ok(true, 'unauthenticated POST rejected');
+		}
+	});
+
+	function resolveBankAccount(session, storeId, label) {
+		return apiRequest('/bank_account.php', { bearer: session.bearer }).then(function(accounts) {
+			const rows = accounts.data || accounts.result || [];
+			if (rows.length > 0) {
+				return (rows[0].bank_account || rows[0]).id;
+			}
+			return apiRequest('/bank_account.php', {
+				method: 'POST',
+				bearer: session.bearer,
+				body: {
+					name: uniqueName(label),
+					store_id: storeId,
+					currency_id: 'MXN',
+					status: 'ACTIVE'
+				}
+			}).then(function(created) {
+				return created && created.id;
+			});
+		});
+	}
+
+	function tryDeleteStoreBankAccount(bearer, id) {
+		return apiRequest('/store_bank_account.php', {
+			method: 'DELETE',
+			bearer: bearer,
+			body: { id: id }
+		}).then(function() { return true; }).catch(function() {
+			return apiRequest('/store_bank_account.php', {
+				method: 'PUT',
+				bearer: bearer,
+				body: { id: id, status: 'DELETED' }
+			}).then(function() { return true; }).catch(function() { return false; });
+		});
+	}
+
+	QUnit.test('store_bank_account CRUD operations', async function(assert) {
+		assert.timeout(45000);
+
+		const session = await login();
+		assert.ok(session.bearer, 'logged in');
+
+		const storeId = testConfig.storeId;
+		const bankAccountId = await resolveBankAccount(session, storeId, 'Test Bank Account');
+		assert.ok(bankAccountId, 'have bank account id');
+
+		const created = await apiRequest('/store_bank_account.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: {
+				store_id: storeId,
+				bank_account_id: bankAccountId
+			}
+		});
+		assert.ok(created && created.id, 'created store bank account link');
+		assert.equal(Number(created.store_id), Number(storeId), 'response store_id matches');
+		assert.equal(Number(created.bank_account_id), Number(bankAccountId), 'response bank_account_id matches');
+
+		let listingOk = false;
+		try {
+			const filterResult = await apiRequest(
+				'/store_bank_account.php?store_id=' + storeId + '&bank_account_id=' + bankAccountId,
+				{ bearer: session.bearer }
+			);
+			const filterRows = filterResult.data || filterResult.result || [filterResult];
+			const found = filterRows.some(function(row) {
+				const record = row.store_bank_account || row;
+				return Number(record.id) === Number(created.id);
+			});
+			listingOk = found;
+		} catch (e) {}
+		assert.ok(listingOk, 'created link appears in filtered list (may need elevated permissions)');
+
+		let lookupOk = false;
+		try {
+			const lookup = await apiRequest('/store_bank_account.php?id=' + created.id, {
+				bearer: session.bearer
+			});
+			const lookedUp = lookup.store_bank_account || lookup;
+			lookupOk = Number(lookedUp.id) === Number(created.id);
+		} catch (e) {}
+		assert.ok(lookupOk, 'can retrieve by id');
+
+		const deletedOk = await tryDeleteStoreBankAccount(session.bearer, created.id);
+		assert.ok(deletedOk, 'deleted or deactivated store bank account link');
+
+		try {
+			await apiRequest('/store_bank_account.php', {
+				method: 'POST',
+				bearer: session.bearer,
+				body: { store_id: storeId }
+			});
+			assert.ok(false, 'creation without bank_account_id should fail');
+		} catch (error) {
+			assert.ok(true, 'missing bank_account_id rejected');
+		}
+
+		try {
+			await apiRequest('/store_bank_account.php', {
+				method: 'POST',
+				bearer: session.bearer,
+				body: { bank_account_id: bankAccountId }
+			});
+			assert.ok(false, 'creation without store_id should fail');
+		} catch (error) {
+			assert.ok(true, 'missing store_id rejected');
+		}
+	});
+
+	QUnit.test('store_bank_account duplicate prevention', async function(assert) {
+		assert.timeout(30000);
+
+		const session = await login();
+		assert.ok(session.bearer, 'logged in');
+
+		const storeId = testConfig.storeId;
+		const bankAccountId = await resolveBankAccount(session, storeId, 'Test Bank Dup');
+		assert.ok(bankAccountId, 'have bank account id');
+
+		const first = await apiRequest('/store_bank_account.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: {
+				store_id: storeId,
+				bank_account_id: bankAccountId
+			}
+		});
+		assert.ok(first && first.id, 'created first link');
+
+		try {
+			await apiRequest('/store_bank_account.php', {
+				method: 'POST',
+				bearer: session.bearer,
+				body: {
+					store_id: storeId,
+					bank_account_id: bankAccountId
+				}
+			});
+			assert.ok(false, 'duplicate creation should fail');
+		} catch (error) {
+			assert.ok(true, 'duplicate store+bank_account pair rejected');
+		}
+
+		const cleaned = await tryDeleteStoreBankAccount(session.bearer, first.id);
+		assert.ok(cleaned, 'cleaned up test link');
+	});
+
+	QUnit.start();
