@@ -14,20 +14,36 @@ async function resolveOrCreateBankAccount(session, storeId) {
 		};
 	}
 
-	const bankAccount = await apiRequest('/bank_account.php', {
-		method: 'POST',
-		bearer: session.bearer,
-		body: {
-			name: uniqueName('ba-cash'),
-			alias: uniqueName('cash'),
-			bank: 'TB',
-			account: 'ACC' + Date.now(),
-			store_id: storeId,
-			currency: 'MXN',
-			status: 'ACTIVE'
-		}
-	});
-	const bankAccountId = (bankAccount && bankAccount.bank_account) ? bankAccount.bank_account.id : bankAccount.id;
+	const accounts = await apiRequest('/bank_account.php', { bearer: session.bearer });
+	const accountRows = accounts.data || accounts.result || [];
+	const totalAccounts = accountRows.length;
+
+	var bankAccountId;
+	if (totalAccounts > 5) {
+		var biggestId = 0;
+		accountRows.forEach(function(row) {
+			var ba = row.bank_account || row;
+			if (Number(ba.id) > biggestId) {
+				biggestId = Number(ba.id);
+			}
+		});
+		bankAccountId = biggestId;
+	} else {
+		const bankAccount = await apiRequest('/bank_account.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: {
+				name: uniqueName('ba-cash'),
+				alias: uniqueName('cash'),
+				bank: 'TB',
+				account: 'ACC' + Date.now(),
+				store_id: storeId,
+				currency: 'MXN',
+				status: 'ACTIVE'
+			}
+		});
+		bankAccountId = (bankAccount && bankAccount.bank_account) ? bankAccount.bank_account.id : bankAccount.id;
+	}
 
 	const storeBank = await apiRequest('/store_bank_account.php', {
 		method: 'POST',
