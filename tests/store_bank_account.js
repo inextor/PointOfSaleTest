@@ -33,12 +33,8 @@ QUnit.test('POST create', async function(assert) {
 	assert.timeout(30000);
 	var s = await login();
 
-	var b = await apiRequest('/bank_account.php', {
-		method: 'POST', bearer: s.bearer,
-		body: { name: uniqueName('t'), alias: uniqueName('a'), bank: 'TB', account: 'A'+Date.now(), store_id: testConfig.storeId, currency: 'MXN', status: 'ACTIVE' }
-	});
-	var bid = (b && b.bank_account) ? b.bank_account.id : b.id;
-	console.log('bank_account created:', bid);
+	var bid = await resolveBankAccountForTest(s, testConfig.storeId);
+	console.log('using bank_account id:', bid);
 
 	var body = { name: uniqueName('SB'), store_id: testConfig.storeId, bank_account_id: bid };
 	console.log('POST body:', JSON.stringify(body));
@@ -91,11 +87,8 @@ QUnit.test('POST duplicate pair', async function(assert) {
 	assert.timeout(30000);
 	var s = await login();
 
-	var b = await apiRequest('/bank_account.php', {
-		method: 'POST', bearer: s.bearer,
-		body: { name: uniqueName('td'), alias: uniqueName('ad'), bank: 'TB', account: 'A'+Date.now(), store_id: testConfig.storeId, currency: 'MXN', status: 'ACTIVE' }
-	});
-	var bid = (b && b.bank_account) ? b.bank_account.id : b.id;
+	var bid = await resolveBankAccountForTest(s, testConfig.storeId);
+	console.log('using bank_account id:', bid);
 
 	var body = { name: uniqueName('SD'), store_id: testConfig.storeId, bank_account_id: bid };
 	console.log('POST 1 body:', JSON.stringify(body));
@@ -140,11 +133,8 @@ QUnit.test('PUT status=DELETED', async function(assert) {
 	assert.timeout(30000);
 	var s = await login();
 
-	var b = await apiRequest('/bank_account.php', {
-		method: 'POST', bearer: s.bearer,
-		body: { name: uniqueName('tdel'), alias: uniqueName('adel'), bank: 'TB', account: 'A'+Date.now(), store_id: testConfig.storeId, currency: 'MXN', status: 'ACTIVE' }
-	});
-	var bid = (b && b.bank_account) ? b.bank_account.id : b.id;
+	var bid = await resolveBankAccountForTest(s, testConfig.storeId);
+	console.log('using bank_account id:', bid);
 
 	var created = await apiRequest('/store_bank_account.php', {
 		method: 'POST', bearer: s.bearer,
