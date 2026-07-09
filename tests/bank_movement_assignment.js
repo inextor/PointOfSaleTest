@@ -14,20 +14,17 @@ async function resolveOrCreateBankAccount(session, storeId) {
 		};
 	}
 
-	const accounts = await apiRequest('/bank_account.php', { bearer: session.bearer });
+	const accounts = await apiRequest(
+		'/bank_account.php?_sort=id_DESC',
+		{ bearer: session.bearer }
+	);
 	const accountRows = accounts.data || accounts.result || [];
-	const totalAccounts = accountRows.length;
+	const totalAccounts = accounts.total || accountRows.length;
 
 	var bankAccountId;
 	if (totalAccounts > 5) {
-		var biggestId = 0;
-		accountRows.forEach(function(row) {
-			var ba = row.bank_account || row;
-			if (Number(ba.id) > biggestId) {
-				biggestId = Number(ba.id);
-			}
-		});
-		bankAccountId = biggestId;
+		var ba = accountRows[0].bank_account || accountRows[0];
+		bankAccountId = ba.id;
 	} else {
 		const bankAccount = await apiRequest('/bank_account.php', {
 			method: 'POST',
