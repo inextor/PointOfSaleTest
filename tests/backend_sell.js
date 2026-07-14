@@ -92,7 +92,7 @@ QUnit.module('Sell', function()
 		catch(error)
 		{
 			console.log(error);
-			assert.ok(false, 'Fallo en algo');
+			assert.ok(false, 'Fallo al verificar orden sin duplicados: ' + (error.message || error));
 		}
 	});
 
@@ -157,7 +157,7 @@ QUnit.module('Sell', function()
 		catch(error)
 		{
 			console.log('Sell simple ', error);
-			assert.ok(false, 'Fallo en algo');
+			assert.ok(false, 'Fallo en Sell Simple: ' + (error.message || error));
 		}
 	});
 
