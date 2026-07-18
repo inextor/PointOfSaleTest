@@ -139,25 +139,25 @@ function doPost(path, body, bearer)
 
 function login(user_type)
 {
-	let user = 'admin';
+	let user = 'nextor@gmail.com';
 
 	if( user_type == 'admin' )
 	{
-		user = 'admin';
+		user = 'nextor@gmail.com';
 	}
 	else if( user_type == 'cashier' )
 	{
-		user = 'admin';
+		user = 'nextor@gmail.com';
 	}
 	else if( user_type == 'cashier' )
 	{
-		user = 'admin';
+		user = 'nextor@gmail.com';
 	}
 
 	return doPost('/login.php',
 	{
-		"username": "admin",
-		"password": "asdf"
+		"username": "nextor@gmail.com",
+		"password": "sdfgsdfggggggg"
 	})
 	.then((data)=>
 	{
@@ -225,7 +225,7 @@ function getItem(bearer,stock_type, qty, store_id)
 				"method":"adjustStock",
 				"stock_records":[{
 					"store_id": store_id,
-					"qty": 6,
+					"qty": qty,
 					"item_id": response.result.item.id,
 				}]
 			};

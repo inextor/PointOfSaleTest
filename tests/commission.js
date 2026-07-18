@@ -35,18 +35,36 @@ function calculateTestCommission(item, orderItem, rule) {
 	return 0;
 }
 
-function findTestCommissionRule(order, rules) {
-	return (rules || []).find((rule) => {
-		return rule.status === 'ACTIVE'
-			&& Number(rule.store_id) === Number(order.store_id)
-			&& Number(rule.price_type_id) === Number(order.price_type_id);
-	}) || null;
+function findTestCommissionRule(order, rules, item, orderItem) {
+	item = item || {};
+	orderItem = orderItem || {};
+
+	const candidates = (rules || []).filter((rule) => {
+		if (rule.status !== 'ACTIVE') return false;
+		if (rule.store_id != null && Number(rule.store_id) !== Number(order.store_id)) return false;
+		if (rule.price_type_id != null && Number(rule.price_type_id) !== Number(order.price_type_id)) return false;
+		if (rule.category_id != null && item.category_id != null && Number(rule.category_id) !== Number(item.category_id)) return false;
+		if (rule.item_id != null && orderItem.item_id != null && Number(rule.item_id) !== Number(orderItem.item_id)) return false;
+		return true;
+	});
+
+	candidates.sort((a, b) => {
+		const scoreA = (a.item_id != null ? 1 : 0) + (a.category_id != null ? 1 : 0) + ((a.store_id != null || a.price_type_id != null) ? 1 : 0);
+		const scoreB = (b.item_id != null ? 1 : 0) + (b.category_id != null ? 1 : 0) + ((b.store_id != null || b.price_type_id != null) ? 1 : 0);
+		if (scoreB !== scoreA) return scoreB - scoreA;
+		if (b.item_id != null && a.item_id == null) return 1;
+		if (a.item_id != null && b.item_id == null) return -1;
+		if (b.category_id != null && a.category_id == null) return 1;
+		if (a.category_id != null && b.category_id == null) return -1;
+		return 0;
+	});
+
+	return candidates[0] || null;
 }
 
 function calculateTestOrderCommission(order, items, rules) {
-	const rule = findTestCommissionRule(order, rules);
-
 	return items.reduce((summary, row) => {
+		const rule = findTestCommissionRule(order, rules, row.item, row.order_item);
 		const commission = calculateTestCommission(row.item, row.order_item, rule);
 		summary.lines.push(commission);
 		summary.total += commission;
@@ -113,7 +131,7 @@ async function createCommissionTestItem(session, commissionType, commission) {
 	return item.item;
 }
 
-async function ensureCommissionRule(session, storeId, priceTypeId, basePercent, discountReductionPerPercent) {
+async function ensureCommissionRule(session, storeId, priceTypeId, basePercent, discountReductionPerPercent, categoryId, itemId) {
 	const search = await apiRequest(
 		'/commission_rule.php?limit=9999',
 		{ bearer: session.bearer }
@@ -121,17 +139,22 @@ async function ensureCommissionRule(session, storeId, priceTypeId, basePercent, 
 
 	const existingRows = search.data || search.result || [];
 	const existing = existingRows.find((rule) => {
-		return Number(rule.store_id) === Number(storeId)
-			&& Number(rule.price_type_id) === Number(priceTypeId);
+		return (storeId != null ? Number(rule.store_id) === Number(storeId) : rule.store_id == null)
+			&& (priceTypeId != null ? Number(rule.price_type_id) === Number(priceTypeId) : rule.price_type_id == null)
+			&& (categoryId != null ? Number(rule.category_id) === Number(categoryId) : rule.category_id == null)
+			&& (itemId != null ? Number(rule.item_id) === Number(itemId) : rule.item_id == null);
 	});
 
 	const payload = {
 		base_percent: basePercent,
 		discount_reduction_per_percent: discountReductionPerPercent,
-		price_type_id: priceTypeId,
-		status: 'ACTIVE',
-		store_id: storeId
+		status: 'ACTIVE'
 	};
+
+	if (storeId != null) payload.store_id = storeId;
+	if (priceTypeId != null) payload.price_type_id = priceTypeId;
+	if (categoryId != null) payload.category_id = categoryId;
+	if (itemId != null) payload.item_id = itemId;
 
 	if (existing && existing.id) {
 		const updated = await apiRequest('/commission_rule.php', {
@@ -621,4 +644,218 @@ QUnit.test('full order supports the three commission assignment forms', function
 			bearer: session.bearer
 		});
 		assert.ok(pendingBills.find(row => Number(row.bill_id) === Number(generated.generated_bill_ids[0])), 'manual commission bill appears as pending payable commission');
+	});
+
+	QUnit.test('rule specificity matches category and item overrides', function(assert) {
+		const order = { store_id: 1, price_type_id: 1 };
+		const rules = [
+			{ status: 'ACTIVE', store_id: 1, price_type_id: 1, base_percent: 5, discount_reduction_per_percent: 0 },
+			{ status: 'ACTIVE', store_id: 1, price_type_id: 1, category_id: 10, base_percent: 8, discount_reduction_per_percent: 0 },
+			{ status: 'ACTIVE', item_id: 42, base_percent: 12, discount_reduction_per_percent: 0 }
+		];
+
+		const storeRule = findTestCommissionRule(order, rules, { category_id: 99 }, { item_id: 50 });
+		assert.equal(storeRule.base_percent, 5, 'item not in category 10 or id 42 falls back to store rule');
+
+		const categoryRule = findTestCommissionRule(order, rules, { category_id: 10 }, { item_id: 50 });
+		assert.equal(categoryRule.base_percent, 8, 'item in category 10 uses category rule over store rule');
+
+		const itemRule = findTestCommissionRule(order, rules, { category_id: 10 }, { item_id: 42 });
+		assert.equal(itemRule.base_percent, 12, 'item_id match takes precedence over category match');
+
+		const nullStoreRule = findTestCommissionRule(
+			{ store_id: 1, price_type_id: 1 },
+			[
+				{ status: 'ACTIVE', base_percent: 3, discount_reduction_per_percent: 0 },
+				{ status: 'ACTIVE', store_id: 1, price_type_id: 1, base_percent: 7, discount_reduction_per_percent: 0 }
+			],
+			{},
+			{}
+		);
+		assert.equal(nullStoreRule.base_percent, 7, 'rule with store_id set beats null-only rule for same store');
+
+		const nullOnlyRule = findTestCommissionRule(
+			{ store_id: 99, price_type_id: 1 },
+			[
+				{ status: 'ACTIVE', base_percent: 3, discount_reduction_per_percent: 0 },
+				{ status: 'ACTIVE', store_id: 1, price_type_id: 1, base_percent: 7, discount_reduction_per_percent: 0 }
+			],
+			{},
+			{}
+		);
+		assert.equal(nullOnlyRule.base_percent, 3, 'null-only rule matches any store');
+	});
+
+	QUnit.test('commission rule CRUD with category and item fields', async function(assert) {
+		assert.timeout(60000);
+		assert.expect(8);
+
+		const session = await login();
+		assert.ok(session.bearer, 'logged in');
+
+		const basePercent = 15 + Math.floor(Math.random() * 5);
+		const uniqueCategoryId = 90000 + Math.floor(Math.random() * 10000);
+		const payload = {
+			store_id: 1,
+			price_type_id: 1,
+			category_id: uniqueCategoryId,
+			base_percent: basePercent,
+			discount_reduction_per_percent: 0,
+			status: 'ACTIVE'
+		};
+
+		const created = await apiRequest('/commission_rule.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: payload
+		});
+		assert.ok(created.id, 'created commission rule via POST');
+		const ruleId = created.id;
+
+		const listed = await apiRequest('/commission_rule.php?limit=9999', {
+			bearer: session.bearer
+		});
+		const listedRows = listed.data || listed.result || [];
+		assert.ok(listedRows.find(r => Number(r.id) === ruleId), 'GET defaults to ACTIVE rules and includes created rule');
+
+		const inactive = await apiRequest('/commission_rule.php?status=INACTIVE&limit=9999', {
+			bearer: session.bearer
+		});
+		const inactiveRows = inactive.data || inactive.result || [];
+		assert.ok(!inactiveRows.find(r => Number(r.id) === ruleId), 'GET with status=INACTIVE does not include active rule');
+
+		const deleted = await apiRequest('/commission_rule.php', {
+			method: 'DELETE',
+			bearer: session.bearer,
+			body: { id: ruleId }
+		});
+		assert.ok(deleted.result === 'ok', 'DELETE soft-deletes the rule');
+
+		const listedAfter = await apiRequest('/commission_rule.php?limit=9999', {
+			bearer: session.bearer
+		});
+		const listedAfterRows = listedAfter.data || listedAfter.result || [];
+		assert.ok(!listedAfterRows.find(r => Number(r.id) === ruleId), 'soft-deleted rule no longer appears in default GET');
+
+		const inactiveAfter = await apiRequest('/commission_rule.php?status=INACTIVE&limit=9999', {
+			bearer: session.bearer
+		});
+		const inactiveAfterRows = inactiveAfter.data || inactiveAfter.result || [];
+		assert.ok(inactiveAfterRows.find(r => Number(r.id) === ruleId), 'soft-deleted rule appears when status=INACTIVE is requested');
+
+		try {
+			await apiRequest('/commission_rule.php', {
+				method: 'POST',
+				bearer: session.bearer,
+				body: { base_percent: 10 }
+			});
+			assert.ok(false, 'POST without any matching field should fail');
+		} catch (error) {
+			assert.ok(true, 'POST without any matching field returns error');
+		}
+	});
+
+	QUnit.test('agent fallback uses cashier when client has no agent', async function(assert) {
+		assert.timeout(60000);
+		assert.expect(5);
+
+		const session = await login();
+		const storeId = Number(session.user.store_id || testConfig.storeId);
+		const priceTypeId = 1;
+
+		assert.ok(session.bearer, 'logged in');
+
+		await ensureCommissionRule(session, storeId, priceTypeId, 5, 0);
+		assert.ok(true, 'created commission rule for store');
+
+		const amountItem = await createCommissionTestItem(session, 'AMOUNT', 10);
+
+		const orderItems = [
+			commissionOrderItem(amountItem, 2, 100, 200)
+		];
+
+		const startedAt = new Date(Date.now() - 2000);
+		const orderPayload = commissionOrderPayload(session, { id: null, name: '' }, storeId, priceTypeId, orderItems);
+
+		const orderInfo = await apiRequest('/order_info.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: orderPayload
+		});
+		assert.ok(orderInfo.order && orderInfo.order.id, 'created order without client');
+		const orderId = orderInfo.order.id;
+
+		const paymentInfo = await apiRequest('/payment_info.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: paymentPayload(orderId, orderInfo.order.total, session.user.id)
+		});
+		const paymentId = paymentInfo.payment && paymentInfo.payment.id;
+		assert.ok(paymentId, 'paid order');
+
+		const endedAt = new Date(Date.now() + 2000);
+		const date_start = mysqlDate(startedAt);
+		const date_end = mysqlDate(endedAt);
+
+		const summaryReport = await apiRequest(
+			'/reports/getCommissionSummaryByAgent.php?date_start=' + encodeURIComponent(date_start)
+			+ '&date_end=' + encodeURIComponent(date_end)
+			+ '&order_id=' + encodeURIComponent(orderId),
+			{ bearer: session.bearer }
+		);
+		const agentRow = summaryReport.find(row => Number(row.agent_id) === Number(session.user.id));
+		assert.ok(agentRow, 'order without client still appears in commission report under cashier as agent');
+		assertMoneyEqual(assert, agentRow.total_commission, 20, 'commission amount matches cashier fallback');
+	});
+
+	QUnit.test('per-item commission_generation created on generate_commission_bills', async function(assert) {
+		assert.timeout(60000);
+		assert.expect(6);
+
+		const session = await login();
+		const storeId = Number(session.user.store_id || testConfig.storeId);
+		const priceTypeId = 1;
+
+		assert.ok(session.bearer, 'logged in');
+
+		const amountItem = await createCommissionTestItem(session, 'AMOUNT', 10);
+		const percentItem = await createCommissionTestItem(session, 'PERCENT', 5);
+
+		const orderItems = [
+			commissionOrderItem(amountItem, 2, 100, 200),
+			commissionOrderItem(percentItem, 1, 200, 200)
+		];
+
+		const orderInfo = await apiRequest('/order_info.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: commissionOrderPayload(session, { id: null, name: '' }, storeId, priceTypeId, orderItems)
+		});
+		assert.ok(orderInfo.order && orderInfo.order.id, 'created order with two item types');
+		const orderId = orderInfo.order.id;
+
+		const paymentInfo = await apiRequest('/payment_info.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: paymentPayload(orderId, orderInfo.order.total, session.user.id)
+		});
+		const paymentId = paymentInfo.payment && paymentInfo.payment.id;
+		assert.ok(paymentId, 'paid order');
+
+		const generated = await apiRequest('/generate_commission_bills.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: {
+				selections: [{ order_id: orderId, payment_id: paymentId }]
+			}
+		});
+		assert.equal(generated.status, 'success', 'commission generation succeeded');
+		assert.ok(generated.generated_commission_ids.length >= 1, 'commission rows created');
+
+		const itemsReport = await apiRequest('/reports/getCommissionItemsByOrder.php?order_id=' + encodeURIComponent(orderId), {
+			bearer: session.bearer
+		});
+		assert.equal(itemsReport.length, 2, 'item report returns both lines');
+		const totalCommission = itemsReport.reduce((sum, row) => sum + Number(row.commission || 0), 0);
+		assertMoneyEqual(assert, totalCommission, 30, 'per-item commissions sum to expected total (20 from amount + 10 from percent)');
 	});

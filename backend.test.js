@@ -86,7 +86,7 @@ QUnit.module('Sell', function()
 		let random = ''+(d.getFullYear())+'-'+d.getMonth()+'-'-d.getDate()+' '+d.getHours()+':'+d.getMinutes()+':'+d.getSeconds();
 		console.log('Random is',random);
 
-		login('admin').then((bearer)=>
+		login('nextor@gmail.com').then((bearer)=>
 		{
 			console.log('Running 1');
 			assert.ok(true,'Login');
@@ -141,7 +141,7 @@ QUnit.module('Sell', function()
 		const done = assert.async();
 		assert.expect(5);
 
-		login('admin').then((bearer)=>
+		login('nextor@gmail.com').then((bearer)=>
 		{
 			console.log('Running 1');
 			assert.ok(true,'Login');
@@ -213,7 +213,7 @@ QUnit.module('Sell', function()
 	{
 		const done = assert.async();
 
-		login('admin')
+		login('nextor@gmail.com')
 		.then((bearer)=>
 		{
 			return doPost('/item_info.php',
@@ -299,7 +299,7 @@ QUnit.module('Payment Pharos', function()
 	{
 		const done = assert.async();
 
-		login('admin').then((bearer)=>
+		login('nextor@gmail.com').then((bearer)=>
 		{
 			console.log('Running 1');
 			assert.ok(true,'Login Payment Pharos');

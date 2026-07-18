@@ -1,8 +1,5 @@
 QUnit.config.autostart = false;
 
-//document.getElementById('endpoint').value = 'https://trikitrakes.integranet.xyz/api'
-document.getElementById('endpoint').value = window.location.protocol + '//' + window.location.host + '/PointOfSale';
-
 const testConfig = {
 	itemName: 'consigna delivered',
 	storeId: 1,

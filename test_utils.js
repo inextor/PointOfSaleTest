@@ -28,6 +28,23 @@ function createSyncUuid() {
 	return null;
 }
 
+function getUUID() {
+	if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+		return window.crypto.randomUUID();
+	}
+	var buf = new Uint8Array(16);
+	if (window.crypto && window.crypto.getRandomValues) {
+		window.crypto.getRandomValues(buf);
+	} else {
+		for (var i = 0; i < 16; i++) buf[i] = Math.floor(Math.random() * 256);
+	}
+	buf[6] = (buf[6] & 0x0f) | 0x40;
+	buf[8] = (buf[8] & 0x3f) | 0x80;
+	var hex = [];
+	for (var i = 0; i < 16; i++) hex.push((buf[i] < 16 ? '0' : '') + buf[i].toString(16));
+	return hex[0]+hex[1]+hex[2]+hex[3]+'-'+hex[4]+hex[5]+'-'+hex[6]+hex[7]+'-'+hex[8]+hex[9]+'-'+hex[10]+hex[11]+hex[12]+hex[13]+hex[14]+hex[15];
+}
+
 function createPaymentSyncIdentifier(agentId) {
 	var syncUuid = createSyncUuid();
 	return syncUuid ? { sync_uuid: syncUuid } : { sync_id: createAgentSyncId(agentId) };
@@ -263,7 +280,7 @@ function getItem(bearer, stock_type, qty, store_id) {
 				"method": "adjustStock",
 				"stock_records": [{
 					"store_id": store_id,
-					"qty": 6,
+					"qty": qty,
 					"item_id": response.result.item.id
 				}]
 			};

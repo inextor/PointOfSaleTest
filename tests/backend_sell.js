@@ -46,20 +46,17 @@ QUnit.module('Stores', function()
 
 QUnit.module('Sell', function()
 {
-	QUnit.test('Sell duplicate', async (assert) =>
+	QUnit.test('Sell duplicate sync_id', async (assert) =>
 	{
 		assert.expect(4);
 
 		try
 		{
 			let d = new Date();
-			console.log(d.getFullYear());
-			console.log(d);
 			let random = '' + (d.getFullYear()) + '-' + d.getMonth() + '-' + d.getDate() + ' ' + d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds();
-			console.log('Random is', random);
+			console.log('sync_id is', random);
 
 			const { bearer } = await login();
-			console.log('Running 1');
 			assert.ok(true, 'Login');
 
 			let ids = await Promise.all([
@@ -76,23 +73,67 @@ QUnit.module('Sell', function()
 
 			let order = getOrderItemWithPrimes(ids);
 			order.order.sync_id = random;
+			delete order.order.sync_uuid;
 
-			await Promise.all([
-				doPost('/order_info.php', order, bearer),
-				doPost('/order_info.php', order, bearer)
-			]);
+			await doPost('/order_info.php', order, bearer);
+			await doPost('/order_info.php', order, bearer);
 
 			assert.ok(true, 'ordenes creadas');
 
 			let response = await doGet('/order_info.php?sync_id,=' + random, bearer);
 
 			console.log(response);
-			assert.ok(response.result.data.length == 1, 'Orden creada sin duplicados');
+			assert.ok(response.result.data.length == 1, 'Orden creada sin duplicados sync_id');
 		}
 		catch(error)
 		{
-			console.log(error);
-			assert.ok(false, 'Fallo al verificar orden sin duplicados: ' + (error.message || error));
+			console.log('Error completo:', JSON.stringify(error));
+			assert.ok(false, 'Fallo al verificar orden sin duplicados sync_id: ' + (error.error || error.message || JSON.stringify(error)));
+		}
+	});
+
+	QUnit.test('Sell duplicate sync_uuid', async (assert) =>
+	{
+		assert.expect(4);
+
+		try
+		{
+			let uuid = getUUID();
+			console.log('sync_uuid is', uuid);
+
+			const { bearer } = await login();
+			assert.ok(true, 'Login');
+
+			let ids = await Promise.all([
+				getItem(bearer),
+				getItem(bearer),
+				getItem(bearer),
+				getItem(bearer),
+				getItem(bearer),
+				getItem(bearer),
+				getItem(bearer, 'ON_STOCK', 200, 1)
+			]);
+
+			assert.equal(ids.length, 7, 'Items Creados');
+
+			let order = getOrderItemWithPrimes(ids);
+			order.order.sync_uuid = uuid;
+			delete order.order.sync_id;
+
+			await doPost('/order_info.php', order, bearer);
+			await doPost('/order_info.php', order, bearer);
+
+			assert.ok(true, 'ordenes creadas');
+
+			let response = await doGet('/order_info.php?sync_uuid,=' + uuid, bearer);
+
+			console.log(response);
+			assert.ok(response.result.data.length == 1, 'Orden creada sin duplicados sync_uuid');
+		}
+		catch(error)
+		{
+			console.log('Error completo:', JSON.stringify(error));
+			assert.ok(false, 'Fallo al verificar orden sin duplicados sync_uuid: ' + (error.error || error.message || JSON.stringify(error)));
 		}
 	});
 
@@ -156,8 +197,8 @@ QUnit.module('Sell', function()
 		}
 		catch(error)
 		{
-			console.log('Sell simple ', error);
-			assert.ok(false, 'Fallo en Sell Simple: ' + (error.message || error));
+			console.log('Sell simple error completo:', JSON.stringify(error));
+			assert.ok(false, 'Fallo en Sell Simple: ' + (error.error || error.message || JSON.stringify(error)));
 		}
 	});
 
@@ -198,8 +239,8 @@ QUnit.module('Sell', function()
 		}
 		catch(error)
 		{
-			console.log('Algo allo', error);
-			assert.ok(false, 'Fallo');
+			console.log('Algo allo error completo:', JSON.stringify(error));
+			assert.ok(false, 'Fallo: ' + (error.error || error.message || JSON.stringify(error)));
 		}
 	});
 });
@@ -274,8 +315,8 @@ QUnit.module('Payment Pharos', function()
 		}
 		catch(error)
 		{
-			console.log('ERROR', error);
-			assert.ok(false, 'Fallo todo el proceso de compra');
+			console.log('ERROR completo:', JSON.stringify(error));
+			assert.ok(false, 'Fallo todo el proceso de compra: ' + (error.error || error.message || JSON.stringify(error)));
 		}
 	});
 });

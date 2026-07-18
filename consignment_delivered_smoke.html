@@ -57,7 +57,7 @@
 		<input id="endpoint" value="https://test.integranet.xyz/api">
 
 		<label for="username">Username</label>
-		<input id="username" value="nextor">
+		<input id="username" value="nextor@gmail.com">
 
 		<label for="password">Password</label>
 		<input id="password" value="sdfgsdfggggggg" type="password">
@@ -126,12 +126,12 @@
 				return data;
 			}
 
-			async function login() {
+			async function login(username, password) {
 				const data = await request('/login.php', {
 					method: 'POST',
 					body: {
-						username: document.getElementById('username').value,
-						password: document.getElementById('password').value
+						username: username || document.getElementById('username').value,
+						password: password || document.getElementById('password').value
 					}
 				});
 
@@ -140,6 +140,18 @@
 				}
 
 				return data.session.id;
+			}
+
+			async function grantConsignmentDeliveredPermission(userId) {
+				const adminBearer = await login('nextor@gmail.com', 'sdfgsdfggggggg');
+				return request('/user_permission.php', {
+					method: 'PUT',
+					bearer: adminBearer,
+					body: {
+						user_id: userId,
+						add_consignment_delivered: true
+					}
+				});
 			}
 
 			async function getCurrentUser(bearer) {
@@ -289,6 +301,9 @@
 
 					const user = await getCurrentUser(bearer);
 					log('User:', { id: user.id, name: user.name || user.username || null });
+
+					await grantConsignmentDeliveredPermission(user.id);
+					log('Permission granted');
 
 					const itemId = await findOrCreateItem(bearer);
 					log('Item:', { id: itemId, name: config.itemName });
