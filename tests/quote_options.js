@@ -32,30 +32,18 @@ async function ensureUserProductionArea(session) {
 }
 
 async function createQuoteOptionItem(bearer, index) {
-	const response = await apiRequest('/item_info.php', {
-		method: 'POST',
-		bearer,
-		body: {
-			item: {
-				applicable_tax: 'DEFAULT',
-				availability_type: 'ON_STOCK',
-				clave_sat: '53111603',
-				currency_id: 'MXN',
-				name: uniqueName('Quote Option Stock ' + index),
-				note_required: 'NO',
-				on_sale: 'NO',
-				reference_price: 0,
-				status: 'ACTIVE',
-				unidad_medida_sat_id: 'H87'
-			}
-		}
+	return getOrCreateItem(bearer, {
+		applicable_tax: 'DEFAULT',
+		availability_type: 'ON_STOCK',
+		clave_sat: '53111603',
+		currency_id: 'MXN',
+		name: 'Quote Option Stock ' + index,
+		note_required: 'NO',
+		on_sale: 'NO',
+		reference_price: 0,
+		status: 'ACTIVE',
+		unidad_medida_sat_id: 'H87'
 	});
-
-	if (!response.item || !response.item.id) {
-		throw new Error('Option item creation did not return item.id: ' + JSON.stringify(response));
-	}
-
-	return response.item;
 }
 
 async function createQuoteOptionsParent(bearer, optionItems) {

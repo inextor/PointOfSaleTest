@@ -102,33 +102,27 @@ async function createCommissionTestClient(session, storeId, priceTypeId) {
 }
 
 async function createCommissionTestItem(session, commissionType, commission) {
-	const item = await apiRequest('/item_info.php', {
-		method: 'POST',
-		bearer: session.bearer,
-		body: {
-			item: {
-				applicable_tax: 'EXEMPT',
-				availability_type: 'ALWAYS',
-				clave_sat: '53111603',
-				commission: commission,
-				commission_currency_id: 'MXN',
-				commission_type: commissionType,
-				currency_id: 'MXN',
-				name: uniqueName('Commission ' + commissionType),
-				note_required: 'NO',
-				on_sale: 'YES',
-				reference_price: 0,
-				status: 'ACTIVE',
-				unidad_medida_sat_id: 'H87'
-			}
-		}
+	const item = await getOrCreateItem(session.bearer, {
+		applicable_tax: 'EXEMPT',
+		availability_type: 'ALWAYS',
+		clave_sat: '53111603',
+		commission: commission,
+		commission_currency_id: 'MXN',
+		commission_type: commissionType,
+		currency_id: 'MXN',
+		name: 'Commission Test Item ' + commissionType + ' ' + commission,
+		note_required: 'NO',
+		on_sale: 'YES',
+		reference_price: 0,
+		status: 'ACTIVE',
+		unidad_medida_sat_id: 'H87'
 	});
 
-	if (!item.item || !item.item.id || item.item.commission_type !== commissionType) {
+	if (!item.id || item.commission_type !== commissionType) {
 		throw new Error('Commission item creation failed: ' + JSON.stringify(item));
 	}
 
-	return item.item;
+	return item;
 }
 
 async function ensureCommissionRule(session, storeId, priceTypeId, basePercent, discountReductionPerPercent, categoryId, itemId) {

@@ -253,69 +253,83 @@ function getNewAdressP(client_id, bearer) {
 	return doPost('/address.php', address, bearer);
 }
 
-function getItem(bearer, stock_type, qty, store_id) {
+async function findItemByName(bearer, name) {
+	var found = await apiRequest('/item_info.php?name=' + encodeURIComponent(name), { bearer: bearer });
+	var rows = found.data || found.result || [];
+	var row = rows.find(function(r) {
+		var item = r.item || r;
+		return item.name === name;
+	});
+
+	return row ? (row.item || row) : null;
+}
+
+async function getOrCreateItem(bearer, itemFields) {
+	var existing = await findItemByName(bearer, itemFields.name);
+	if (existing) {
+		return existing;
+	}
+
+	var created = await apiRequest('/item_info.php', {
+		method: 'POST',
+		bearer: bearer,
+		body: { item: itemFields }
+	});
+
+	if (!created.item || !created.item.id) {
+		throw new Error('Item creation response did not include item.id: ' + JSON.stringify(created));
+	}
+
+	return created.item;
+}
+
+async function getItem(bearer, stock_type, qty, store_id) {
 	if (stock_type === undefined)
 		stock_type = 'ALWAYS';
 
-	return doPost(
-		'/item_info.php',
-		{
-			"item": {
-				"availability_type": stock_type,
-				"clave_sat": "53111603",
-				"name": "Item Test " + Date.now(),
-				"note_required": "NO",
-				"on_sale": "NO",
-				"reference_price": 0,
-				"status": "ACTIVE",
-				"unidad_medida_sat_id": "H87"
-			}
-		},
-		bearer
-	)
-	.then(function(response) {
-		if (stock_type === 'ON_STOCK' && qty !== undefined) {
-			console.log('Agregando stock');
-			var object = {
-				"method": "adjustStock",
-				"stock_records": [{
-					"store_id": store_id,
-					"qty": qty,
-					"item_id": response.result.item.id
-				}]
-			};
-
-			return doPost('/updates.php', object, bearer)
-			.then(function() {
-				return response.result.item.id;
-			});
-		}
-
-		return response.result.item.id;
+	var item = await getOrCreateItem(bearer, {
+		availability_type: stock_type,
+		clave_sat: '53111603',
+		name: 'Test Item ' + stock_type,
+		note_required: 'NO',
+		on_sale: 'NO',
+		reference_price: 0,
+		status: 'ACTIVE',
+		unidad_medida_sat_id: 'H87'
 	});
+
+	if (stock_type === 'ON_STOCK' && qty !== undefined) {
+		await apiRequest('/updates.php', {
+			method: 'POST',
+			bearer: bearer,
+			body: {
+				method: 'adjustStock',
+				stock_records: [{
+					store_id: store_id,
+					qty: qty,
+					item_id: item.id
+				}]
+			}
+		});
+	}
+
+	return item.id;
 }
 
-function getItemWithCommanda(bearer, commanda_type_id) {
-	return doPost(
-		'/item_info.php',
-		{
-			"item": {
-				"availability_type": 'ALWAYS',
-				"clave_sat": "53111603",
-				"name": "Item Test " + Date.now(),
-				"note_required": "NO",
-				"on_sale": "NO",
-				"reference_price": 0,
-				"status": "ACTIVE",
-				"unidad_medida_sat_id": "H87",
-				"commanda_type_id": commanda_type_id
-			}
-		},
-		bearer
-	)
-	.then(function(response) {
-		return response.result.item.id;
+async function getItemWithCommanda(bearer, commanda_type_id) {
+	var item = await getOrCreateItem(bearer, {
+		availability_type: 'ALWAYS',
+		clave_sat: '53111603',
+		name: 'Test Item Commanda ' + commanda_type_id,
+		note_required: 'NO',
+		on_sale: 'NO',
+		reference_price: 0,
+		status: 'ACTIVE',
+		unidad_medida_sat_id: 'H87',
+		commanda_type_id: commanda_type_id
 	});
+
+	return item.id;
 }
 
 function promiseObject(obj) {
@@ -530,27 +544,17 @@ function backendSaleOrderPayload(itemIds, userId) {
 	return order;
 }
 
-async function createSaleTestItem(bearer, availabilityType, stockQty) {
-	var data = await apiRequest('/item_info.php', {
-		method: 'POST',
-		bearer: bearer,
-		body: {
-			item: {
-				availability_type: availabilityType,
-				clave_sat: '53111603',
-				name: uniqueName('Item Test'),
-				note_required: 'NO',
-				on_sale: 'NO',
-				reference_price: 0,
-				status: 'ACTIVE',
-				unidad_medida_sat_id: 'H87'
-			}
-		}
+async function createSaleTestItem(bearer, availabilityType, stockQty, name) {
+	var item = await getOrCreateItem(bearer, {
+		availability_type: availabilityType,
+		clave_sat: '53111603',
+		name: name,
+		note_required: 'NO',
+		on_sale: 'NO',
+		reference_price: 0,
+		status: 'ACTIVE',
+		unidad_medida_sat_id: 'H87'
 	});
-
-	if (!data.item || !data.item.id) {
-		throw new Error('Sale test item creation response did not include item.id: ' + JSON.stringify(data));
-	}
 
 	if (availabilityType === 'ON_STOCK') {
 		await apiRequest('/updates.php', {
@@ -559,25 +563,37 @@ async function createSaleTestItem(bearer, availabilityType, stockQty) {
 			body: {
 				method: 'adjustStock',
 				stock_records: [
-					{ store_id: testConfig.storeId, qty: stockQty, item_id: data.item.id }
+					{ store_id: testConfig.storeId, qty: stockQty, item_id: item.id }
 				]
 			}
 		});
 	}
 
-	return data.item.id;
+	return item.id;
 }
 
 async function createBackendSaleItems(bearer) {
 	var itemIds = [];
 
 	for (var i = 0; i < 6; i++) {
-		itemIds.push(await createSaleTestItem(bearer, 'ALWAYS'));
+		itemIds.push(await createSaleTestItem(bearer, 'ALWAYS', undefined, 'Test Sale Item ' + (i + 1)));
 	}
 
-	itemIds.push(await createSaleTestItem(bearer, 'ON_STOCK', 200));
+	itemIds.push(await createSaleTestItem(bearer, 'ON_STOCK', 200, 'Test Sale Item 7'));
 
 	return itemIds;
+}
+
+async function cancelTestOrder(bearer, orderId, reason) {
+	return apiRequest('/updates.php', {
+		method: 'POST',
+		bearer: bearer,
+		body: {
+			method: 'cancelOrder',
+			order_id: orderId,
+			cancellation_reason: reason || 'POSTest cleanup'
+		}
+	});
 }
 
 async function resolveBankAccountForTest(session, storeId) {

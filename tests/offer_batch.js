@@ -2,31 +2,20 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 {
 	async function createBatchItem(bearer, name)
 	{
-		var data = await apiRequest('/item_info.php', {
-			method: 'POST',
-			bearer: bearer,
-			body: {
-				item: {
-					applicable_tax: 'DEFAULT',
-					availability_type: 'ON_STOCK',
-					batch_option: 'BATCH_AND_EXPIRATION',
-					clave_sat: '53111603',
-					currency_id: 'MXN',
-					name: name,
-					note_required: 'NO',
-					on_sale: 'YES',
-					reference_price: 0,
-					status: 'ACTIVE',
-					tax_percent: 0,
-					unidad_medida_sat_id: 'H87'
-				}
-			}
+		return getOrCreateItem(bearer, {
+			applicable_tax: 'DEFAULT',
+			availability_type: 'ON_STOCK',
+			batch_option: 'BATCH_AND_EXPIRATION',
+			clave_sat: '53111603',
+			currency_id: 'MXN',
+			name: name,
+			note_required: 'NO',
+			on_sale: 'YES',
+			reference_price: 0,
+			status: 'ACTIVE',
+			tax_percent: 0,
+			unidad_medida_sat_id: 'H87'
 		});
-
-		if (!data.item || !data.item.id)
-			throw new Error('Item creation did not return item.id: ' + JSON.stringify(data));
-
-		return data.item;
 	}
 
 	async function addBatchStock(bearer, itemId, storeId, batch, expirationDate, qty)
@@ -296,7 +285,7 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			const storeId = Number(user.store_id || 1);
 			assert.ok(true, 'Login ok');
 
-			const item = await createBatchItem(bearer, uniqueName('Oferta Lote Item'));
+			const item = await createBatchItem(bearer, 'Test Offer Item 1');
 			const batchA = randomBatch('A');
 			const batchB = randomBatch('B');
 			const expA = '2099-01-01';
@@ -324,6 +313,9 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.ok(appliedB, 'Se aplico la oferta al lote correcto');
 			assert.equal(itemB.offer_id, offer.id, 'Item del lote B tiene la oferta');
 			assert.equal(Number(itemB.unitary_price), 50, 'Precio del lote B con 50% de descuento');
+
+			await cancelTestOrder(bearer, orderA.order.id, 'POSTest offer percent batch');
+			await cancelTestOrder(bearer, orderB.order.id, 'POSTest offer percent batch');
 		}
 		catch(error)
 		{
@@ -342,7 +334,7 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			const storeId = Number(user.store_id || 1);
 			assert.ok(true, 'Login ok');
 
-			const item = await createBatchItem(bearer, uniqueName('Oferta Amount Item'));
+			const item = await createBatchItem(bearer, 'Test Offer Item 2');
 			const batchA = randomBatch('A');
 			const batchB = randomBatch('B');
 			const exp = '2099-01-01';
@@ -369,6 +361,9 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.ok(appliedB, 'Se aplico la oferta al lote correcto');
 			assert.equal(itemB.offer_id, offer.id, 'Item del lote B tiene la oferta');
 			assert.equal(Number(itemB.unitary_price), 80, 'Precio del lote B con 20 de descuento');
+
+			await cancelTestOrder(bearer, orderA.order.id, 'POSTest offer amount batch');
+			await cancelTestOrder(bearer, orderB.order.id, 'POSTest offer amount batch');
 		}
 		catch(error)
 		{
@@ -387,7 +382,7 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			const storeId = Number(user.store_id || 1);
 			assert.ok(true, 'Login ok');
 
-			const item = await createBatchItem(bearer, uniqueName('Oferta Exp Item'));
+			const item = await createBatchItem(bearer, 'Test Offer Item 3');
 			const batchFar = randomBatch('FAR');
 			const batchNear = randomBatch('NEAR');
 			const today = new Date();
@@ -419,6 +414,9 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.ok(appliedNear, 'Se aplico la oferta a caducidad proxima');
 			assert.equal(itemNear.offer_id, offer.id, 'Item de caducidad proxima tiene la oferta');
 			assert.equal(Number(itemNear.unitary_price), 50, 'Precio con 50% de descuento');
+
+			await cancelTestOrder(bearer, orderFar.order.id, 'POSTest offer percent expiration');
+			await cancelTestOrder(bearer, orderNear.order.id, 'POSTest offer percent expiration');
 		}
 		catch(error)
 		{
@@ -437,7 +435,7 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			const storeId = Number(user.store_id || 1);
 			assert.ok(true, 'Login ok');
 
-			const item = await createBatchItem(bearer, uniqueName('Oferta MXN Item'));
+			const item = await createBatchItem(bearer, 'Test Offer Item 4');
 			const batchA = randomBatch('A');
 			const batchB = randomBatch('B');
 			const exp = '2099-01-01';
@@ -467,6 +465,9 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.equal(freeItem.order_item.is_free_of_charge, 'YES', 'El item gratis esta marcado como de cortesia');
 			assert.equal(paidItem.order_item.is_free_of_charge, 'NO', 'El item pagado no es gratis');
 			assert.equal(Number(freeItem.order_item.qty) + Number(paidItem.order_item.qty), 2, 'La suma de cantidades se conserva (2x1)');
+
+			await cancelTestOrder(bearer, orderA.order.id, 'POSTest offer nxm batch');
+			await cancelTestOrder(bearer, orderB.order.id, 'POSTest offer nxm batch');
 		}
 		catch(error)
 		{

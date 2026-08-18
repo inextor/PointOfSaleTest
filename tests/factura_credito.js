@@ -121,60 +121,40 @@ async function createCreditClient(bearer, agent) {
 }
 
 async function createBatchFacturaItem(bearer) {
-	const item = await apiRequest('/item_info.php', {
-		method: 'POST',
-		bearer,
-			body: {
-				item: {
-					applicable_tax: 'PERCENT',
-					availability_type: 'ON_STOCK',
-					batch_option: 'BATCH_AND_EXPIRATION',
-					clave_sat: '53111603',
-				currency_id: 'MXN',
-				name: facturaCreditTestConfig.itemName + ' ' + Date.now(),
-				note_required: 'NO',
-					on_sale: 'YES',
-					reference_price: facturaCreditTestConfig.price,
-					status: 'ACTIVE',
-					tax_percent: facturaCreditTestConfig.taxPercent,
-					unidad_medida_sat_id: 'H87'
-				}
-			}
+	const item = await getOrCreateItem(bearer, {
+		applicable_tax: 'PERCENT',
+		availability_type: 'ON_STOCK',
+		batch_option: 'BATCH_AND_EXPIRATION',
+		clave_sat: '53111603',
+		currency_id: 'MXN',
+		name: facturaCreditTestConfig.itemName,
+		note_required: 'NO',
+		on_sale: 'YES',
+		reference_price: facturaCreditTestConfig.price,
+		status: 'ACTIVE',
+		tax_percent: facturaCreditTestConfig.taxPercent,
+		unidad_medida_sat_id: 'H87'
 	});
 
-	if (!item.item || !item.item.id) {
-		throw new Error('Item creation response did not include item.id: ' + JSON.stringify(item));
-	}
-
-	return item.item;
+	return item;
 }
 
 async function createNotaCreditoItem(bearer) {
-	const item = await apiRequest('/item_info.php', {
-		method: 'POST',
-		bearer,
-		body: {
-			item: {
-				applicable_tax: 'PERCENT',
-				availability_type: 'ALWAYS',
-				clave_sat: '53111603',
-				currency_id: 'MXN',
-				name: uniqueName(notaCreditoTestConfig.itemName),
-				note_required: 'NO',
-				on_sale: 'YES',
-				reference_price: notaCreditoTestConfig.price,
-				status: 'ACTIVE',
-				tax_percent: notaCreditoTestConfig.taxPercent,
-				unidad_medida_sat_id: 'H87'
-			}
-		}
+	const item = await getOrCreateItem(bearer, {
+		applicable_tax: 'PERCENT',
+		availability_type: 'ALWAYS',
+		clave_sat: '53111603',
+		currency_id: 'MXN',
+		name: notaCreditoTestConfig.itemName,
+		note_required: 'NO',
+		on_sale: 'YES',
+		reference_price: notaCreditoTestConfig.price,
+		status: 'ACTIVE',
+		tax_percent: notaCreditoTestConfig.taxPercent,
+		unidad_medida_sat_id: 'H87'
 	});
 
-	if (!item.item || !item.item.id) {
-		throw new Error('Nota credito item creation response did not include item.id: ' + JSON.stringify(item));
-	}
-
-	return item.item;
+	return item;
 }
 
 async function addItemPrice(itemId, store, bearer) {

@@ -75,7 +75,7 @@ QUnit.module('Sell', function()
 			order.order.sync_id = random;
 			delete order.order.sync_uuid;
 
-			await doPost('/order_info.php', order, bearer);
+			const createdOrder = await doPost('/order_info.php', order, bearer);
 			await doPost('/order_info.php', order, bearer);
 
 			assert.ok(true, 'ordenes creadas');
@@ -84,6 +84,8 @@ QUnit.module('Sell', function()
 
 			console.log(response);
 			assert.ok(response.result.data.length == 1, 'Orden creada sin duplicados sync_id');
+
+			await cancelTestOrder(bearer, createdOrder.result.order.id, 'POSTest duplicate sync_id');
 		}
 		catch(error)
 		{
@@ -120,7 +122,7 @@ QUnit.module('Sell', function()
 			order.order.sync_uuid = uuid;
 			delete order.order.sync_id;
 
-			await doPost('/order_info.php', order, bearer);
+			const createdOrder = await doPost('/order_info.php', order, bearer);
 			await doPost('/order_info.php', order, bearer);
 
 			assert.ok(true, 'ordenes creadas');
@@ -129,6 +131,8 @@ QUnit.module('Sell', function()
 
 			console.log(response);
 			assert.ok(response.result.data.length == 1, 'Orden creada sin duplicados sync_uuid');
+
+			await cancelTestOrder(bearer, createdOrder.result.order.id, 'POSTest duplicate sync_uuid');
 		}
 		catch(error)
 		{
@@ -208,15 +212,16 @@ QUnit.module('Sell', function()
 		{
 			const { bearer } = await login();
 
-			let response = await doPost('/item_info.php',
-				[
-					{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ALWAYS",on_sale:"NO","name":"Opcion1"}},
-					{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ALWAYS",on_sale:"NO","name":"Opcion2"}},
-					{"item":{unidad_medida_sat_id:"H87",clave_sat:"53111603",availability_type:"ALWAYS",on_sale:"NO","name":"Opcion3"}}
-				], bearer
-			);
-
-			let products = response.result;
+			let products = [];
+			for (let name of ['Opcion1', 'Opcion2', 'Opcion3']) {
+				products.push(await getOrCreateItem(bearer, {
+					unidad_medida_sat_id: "H87",
+					clave_sat: "53111603",
+					availability_type: "ALWAYS",
+					on_sale: "NO",
+					name: name
+				}));
+			}
 
 			assert.ok(true, 'Creacion Articulos de opciones');
 
@@ -225,16 +230,16 @@ QUnit.module('Sell', function()
 					{
 						values:
 						[
-							{ item_option_value:{item_id: products[0].item.id ,max_extra_qty:1,extra_price:0,price:0} },
-							{ item_option_value:{item_id: products[1].item.id ,max_extra_qty:1,extra_price:0,price:0} },
-							{ item_option_value:{item_id: products[2].item.id ,max_extra_qty:1,extra_price:0,price:0} }
+							{ item_option_value:{item_id: products[0].id ,max_extra_qty:1,extra_price:0,price:0} },
+							{ item_option_value:{item_id: products[1].id ,max_extra_qty:1,extra_price:0,price:0} },
+							{ item_option_value:{item_id: products[2].id ,max_extra_qty:1,extra_price:0,price:0} }
 						],
 						item_option:{"name":"Opcion",included_options:1,included_extra_qty:1,max_extra_qty:1,max_options:1}
 					}
 				]
 			};
 
-			await doPost('/item_info.php', item_compuesto, response.bearer);
+			await doPost('/item_info.php', item_compuesto, bearer);
 			assert.ok(true, 'Creacion de Articulo Con opciones');
 		}
 		catch(error)

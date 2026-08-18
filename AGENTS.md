@@ -65,7 +65,11 @@ POST /payment_info.php
 - `login(username?, password?)` — returns `{ bearer, user }`
 - `uniqueName(prefix)` — generates test names with timestamp
 - `testConfig.storeId` — default store ID (1)
-- `createBackendSaleItems(bearer)` — creates 7 test items, returns ids
+- `getOrCreateItem(bearer, itemFields)` — finds item by exact `name` (via `/item_info.php?name=...`) or creates it; returns the item object
+- `findItemByName(bearer, name)` — returns matching item object or `null`
+- `cancelTestOrder(bearer, orderId, reason?)` — cancels a test-created order via `/updates.php` `method: 'cancelOrder'`
+- `createBackendSaleItems(bearer)` — reuses deterministic items `Test Sale Item 1..7`, returns ids
+- Deterministic item names per suite: `Test Offer Item 1..4` (offer_batch), `Commission Test Item <TYPE>`, `Quote Option Stock 1..4`, etc.
 - `backendSaleOrderPayload(itemIds, userId)` — builds order payload
 - `paymentPayload(orderId, total, userId)` — builds payment payload
 - Test modules load `environment.js` (sets `end_point`) + `test_utils.js`
