@@ -49,8 +49,8 @@ function findTestCommissionRule(order, rules, item, orderItem) {
 	});
 
 	candidates.sort((a, b) => {
-		const scoreA = (a.item_id != null ? 1 : 0) + (a.category_id != null ? 1 : 0) + ((a.store_id != null || a.price_type_id != null) ? 1 : 0);
-		const scoreB = (b.item_id != null ? 1 : 0) + (b.category_id != null ? 1 : 0) + ((b.store_id != null || b.price_type_id != null) ? 1 : 0);
+		const scoreA = (a.item_id != null ? 2 : 0) + (a.category_id != null ? 1 : 0) + ((a.store_id != null || a.price_type_id != null) ? 1 : 0);
+		const scoreB = (b.item_id != null ? 2 : 0) + (b.category_id != null ? 1 : 0) + ((b.store_id != null || b.price_type_id != null) ? 1 : 0);
 		if (scoreB !== scoreA) return scoreB - scoreA;
 		if (b.item_id != null && a.item_id == null) return 1;
 		if (a.item_id != null && b.item_id == null) return -1;
@@ -688,17 +688,19 @@ QUnit.test('full order supports the three commission assignment forms', function
 
 	QUnit.test('commission rule CRUD with category and item fields', async function(assert) {
 		assert.timeout(60000);
-		assert.expect(8);
+		assert.expect(9);
 
 		const session = await login();
 		assert.ok(session.bearer, 'logged in');
 
 		const basePercent = 15 + Math.floor(Math.random() * 5);
-		const uniqueCategoryId = 90000 + Math.floor(Math.random() * 10000);
+		const categories = await apiRequest('/category.php?limit=1&status=ACTIVE', { bearer: session.bearer });
+		assert.ok(categories.data && categories.data.length > 0, 'fetched an existing category');
+		const categoryId = categories.data[0].id;
 		const payload = {
 			store_id: 1,
 			price_type_id: 1,
-			category_id: uniqueCategoryId,
+			category_id: categoryId,
 			base_percent: basePercent,
 			discount_reduction_per_percent: 0,
 			status: 'ACTIVE'
