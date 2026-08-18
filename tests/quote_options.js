@@ -241,7 +241,7 @@ async function createOptionsQuote(client, parentItem, optionItems, itemOptionId,
 	return { quote, itemGroup };
 }
 
-async function convertQuoteToDeliveryOrder(quote, itemGroup, parentItem, optionItems, itemOptionId, session, storeId) {
+async function convertQuoteToDeliveryOrder(quote, itemGroup, parentItem, optionItems, itemOptionId, session, storeId, clientName) {
 	const deliveryDate = new Date();
 	deliveryDate.setDate(deliveryDate.getDate() + 2);
 
@@ -252,7 +252,7 @@ async function convertQuoteToDeliveryOrder(quote, itemGroup, parentItem, optionI
 			order: {
 				amount_paid: 0,
 				cashier_user_id: session.user.id,
-				client_name: quote.client_user.name,
+				client_name: clientName || quote.client_user.name,
 				client_user_id: quote.client_user.id,
 				currency_id: 'MXN',
 				delivery_schedule: mysqlDate(deliveryDate),
@@ -355,7 +355,8 @@ QUnit.test('quote with stocked options creates a scheduled production order', as
 		optionItems,
 		parent.itemOption.id,
 		session,
-		storeId
+		storeId,
+		'quote with stocked options creates a scheduled production order'
 	);
 	assert.ok(converted.orderId, 'converted quote to order');
 

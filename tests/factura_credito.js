@@ -222,7 +222,7 @@ async function addBatchStock(itemId, bearer) {
 	return response;
 }
 
-function creditOrderPayload(item, client, store, sessionUser) {
+function creditOrderPayload(item, client, store, sessionUser, clientName) {
 	const taxPercent = facturaCreditTestConfig.taxPercent;
 	const total = facturaCreditTestConfig.price * facturaCreditTestConfig.qty;
 	const split = taxSplitFromTaxIncluded(total, taxPercent);
@@ -233,7 +233,7 @@ function creditOrderPayload(item, client, store, sessionUser) {
 			amount_paid: 0,
 			billing_data_id: facturaCreditTestConfig.billingDataId,
 			cashier_user_id: sessionUser.id,
-			client_name: client.name,
+			client_name: clientName || client.name,
 			client_user_id: client.id,
 			currency_id: store.default_currency_id || 'MXN',
 			discount: 0,
@@ -303,7 +303,7 @@ function creditOrderPayload(item, client, store, sessionUser) {
 	};
 }
 
-function notaCreditoOrderPayload(item, client, store, sessionUser) {
+function notaCreditoOrderPayload(item, client, store, sessionUser, clientName) {
 	const total = notaCreditoTestConfig.price * notaCreditoTestConfig.qty;
 	const split = taxSplitFromTaxIncluded(total, notaCreditoTestConfig.taxPercent);
 
@@ -312,7 +312,7 @@ function notaCreditoOrderPayload(item, client, store, sessionUser) {
 			amount_paid: 0,
 			billing_data_id: notaCreditoTestConfig.billingDataId,
 			cashier_user_id: sessionUser.id,
-			client_name: client.name,
+			client_name: clientName || client.name,
 			client_user_id: client.id,
 			currency_id: store.default_currency_id || 'MXN',
 			discount: 0,
@@ -530,7 +530,7 @@ QUnit.test('credit CFDI 99 with batch item and payment complement', async functi
 	const orderInfo = await apiRequest('/order_info.php', {
 		method: 'POST',
 		bearer: session.bearer,
-		body: creditOrderPayload(item, client, store, session.user)
+		body: creditOrderPayload(item, client, store, session.user, 'factura credito flow with batch and expiration item')
 	});
 	assert.ok(orderInfo.order && orderInfo.order.id, 'created credit order');
 
@@ -590,7 +590,7 @@ QUnit.test('nota de credito flow with non-stock item', async function(assert) {
 	const orderInfo = await apiRequest('/order_info.php', {
 		method: 'POST',
 		bearer: session.bearer,
-		body: notaCreditoOrderPayload(item, client, store, session.user)
+		body: notaCreditoOrderPayload(item, client, store, session.user, 'nota de credito flow with non-stock item')
 	});
 	assert.ok(orderInfo.order && orderInfo.order.id, 'created order');
 	assert.equal(Number(orderInfo.order.total), notaCreditoTestConfig.price, 'order total is 2000');

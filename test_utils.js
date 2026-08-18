@@ -349,12 +349,12 @@ function promiseObject(obj) {
 	});
 }
 
-function getOrderItemWithPrimes(item_ids) {
+function getOrderItemWithPrimes(item_ids, clientName) {
 	var obj = {
 		"order": {
 			"billing_data_id": 1,
 			"cashier_user_id": 1,
-			"client_name": "PUBLICO GRAL 01:13",
+			"client_name": clientName || "PUBLICO GRAL 01:13",
 			"currency_id": "MXN",
 			"marked_for_billing": null,
 			"note": null,
@@ -472,13 +472,13 @@ function paymentPayload(orderId, total, userId) {
 	};
 }
 
-function backendSaleOrderPayload(itemIds, userId) {
+function backendSaleOrderPayload(itemIds, userId, clientName) {
 	var syncId = createAgentSyncId(userId);
 	var order = {
 		order: {
 			billing_data_id: 1,
 			cashier_user_id: 1,
-			client_name: 'PUBLICO GRAL',
+			client_name: clientName || 'PUBLICO GRAL',
 			currency_id: 'MXN',
 			marked_for_billing: null,
 			note: null,

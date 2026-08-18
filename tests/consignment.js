@@ -159,7 +159,7 @@ QUnit.test('recreated backend sell simple flow', async function(assert) {
 	const orderInfo = await apiRequest('/order_info.php', {
 		method: 'POST',
 		bearer: session.bearer,
-		body: backendSaleOrderPayload(itemIds, session.user.id)
+		body: backendSaleOrderPayload(itemIds, session.user.id, 'recreated backend sell simple flow')
 	});
 
 	assert.ok(orderInfo.order && orderInfo.order.id, 'Orden creada');

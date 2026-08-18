@@ -200,7 +200,7 @@ function commissionOrderItem(item, qty, unitaryPrice, total, extra) {
 	};
 }
 
-function commissionOrderPayload(session, client, storeId, priceTypeId, items) {
+function commissionOrderPayload(session, client, storeId, priceTypeId, items, clientName) {
 	const total = items.reduce((sum, row) => sum + Number(row.order_item.total || 0), 0);
 
 	return {
@@ -208,7 +208,7 @@ function commissionOrderPayload(session, client, storeId, priceTypeId, items) {
 			amount_paid: 0,
 			billing_data_id: 1,
 			cashier_user_id: session.user.id,
-			client_name: client.name,
+			client_name: clientName || client.name,
 			client_user_id: client.id,
 			currency_id: 'MXN',
 			discount: 0,
@@ -350,7 +350,7 @@ QUnit.test('full order supports the three commission assignment forms', function
 		const orderInfo = await apiRequest('/order_info.php', {
 			method: 'POST',
 			bearer: session.bearer,
-			body: commissionOrderPayload(session, client, storeId, priceTypeId, orderItems)
+			body: commissionOrderPayload(session, client, storeId, priceTypeId, orderItems, 'full commission report flow assigns amount percent and store price type commissions')
 		});
 		assert.ok(orderInfo.order && orderInfo.order.id, 'created closed commission test order');
 		const orderId = orderInfo.order.id;
@@ -479,7 +479,7 @@ QUnit.test('full order supports the three commission assignment forms', function
 		const orderInfo = await apiRequest('/order_info.php', {
 			method: 'POST',
 			bearer: session.bearer,
-			body: commissionOrderPayload(session, client, storeId, priceTypeId, orderItems)
+			body: commissionOrderPayload(session, client, storeId, priceTypeId, orderItems, 'zero commission payment generation marks the order payment as generated')
 		});
 		assert.ok(orderInfo.order && orderInfo.order.id, 'created zero commission order');
 		const orderId = orderInfo.order.id;
@@ -771,7 +771,7 @@ QUnit.test('full order supports the three commission assignment forms', function
 		];
 
 		const startedAt = new Date(Date.now() - 2000);
-		const orderPayload = commissionOrderPayload(session, { id: null, name: '' }, storeId, priceTypeId, orderItems);
+		const orderPayload = commissionOrderPayload(session, { id: null, name: '' }, storeId, priceTypeId, orderItems, 'agent fallback uses cashier when client has no agent');
 
 		const orderInfo = await apiRequest('/order_info.php', {
 			method: 'POST',
@@ -825,7 +825,7 @@ QUnit.test('full order supports the three commission assignment forms', function
 		const orderInfo = await apiRequest('/order_info.php', {
 			method: 'POST',
 			bearer: session.bearer,
-			body: commissionOrderPayload(session, { id: null, name: '' }, storeId, priceTypeId, orderItems)
+			body: commissionOrderPayload(session, { id: null, name: '' }, storeId, priceTypeId, orderItems, 'per-item commission_generation created on generate_commission_bills')
 		});
 		assert.ok(orderInfo.order && orderInfo.order.id, 'created order with two item types');
 		const orderId = orderInfo.order.id;

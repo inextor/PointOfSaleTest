@@ -97,7 +97,7 @@ QUnit.module('bank_movement transaction types', function() {
 		};
 	}
 
-	async function createOrderAndPayment(session, assert, transactionType) {
+	async function createOrderAndPayment(session, assert, transactionType, clientName) {
 		var storeId = session.user.store_id || testConfig.storeId;
 		var { bankAccountId } = await ensureStoreBankAccountForType(session, storeId, transactionType);
 		assert.ok(bankAccountId, '[' + transactionType + '] have bank_account id=' + bankAccountId);
@@ -108,7 +108,7 @@ QUnit.module('bank_movement transaction types', function() {
 		var orderInfo = await apiRequest('/order_info.php', {
 			method: 'POST',
 			bearer: session.bearer,
-			body: backendSaleOrderPayload(itemIds, session.user.id)
+			body: backendSaleOrderPayload(itemIds, session.user.id, clientName)
 		});
 		assert.ok(orderInfo.order && orderInfo.order.id, '[' + transactionType + '] order created id=' + orderInfo.order.id);
 
@@ -148,7 +148,7 @@ QUnit.module('bank_movement transaction types', function() {
 			var session = await login();
 			assert.ok(session.bearer, '[' + transactionType + '] logged in');
 
-			await createOrderAndPayment(session, assert, transactionType);
+			await createOrderAndPayment(session, assert, transactionType, 'bank_movement ' + transactionType);
 		});
 	});
 });

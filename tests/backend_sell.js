@@ -71,7 +71,7 @@ QUnit.module('Sell', function()
 
 			assert.equal(ids.length, 7, 'Items Creados');
 
-			let order = getOrderItemWithPrimes(ids);
+			let order = getOrderItemWithPrimes(ids, 'Sell duplicate sync_id');
 			order.order.sync_id = random;
 			delete order.order.sync_uuid;
 
@@ -118,7 +118,7 @@ QUnit.module('Sell', function()
 
 			assert.equal(ids.length, 7, 'Items Creados');
 
-			let order = getOrderItemWithPrimes(ids);
+			let order = getOrderItemWithPrimes(ids, 'Sell duplicate sync_uuid');
 			order.order.sync_uuid = uuid;
 			delete order.order.sync_id;
 
@@ -163,7 +163,7 @@ QUnit.module('Sell', function()
 
 			assert.equal(ids.length, 7, 'Items Creados');
 
-			let order = getOrderItemWithPrimes(ids);
+			let order = getOrderItemWithPrimes(ids, 'Sell Simple');
 			let response = await doPost('/order_info.php', order, bearer);
 
 			assert.ok(true, 'Orden Creada');
@@ -293,7 +293,7 @@ QUnit.module('Payment Pharos', function()
 
 			assert.ok(true, 'Direccion creada');
 
-			let order = getOrderItemWithPrimes([response.item_1, response.item_2]);
+			let order = getOrderItemWithPrimes([response.item_1, response.item_2], 'Payment Pharos');
 			order.order.sync_id = getRandom();
 			order.order.client_user_id = response.client.id;
 			order.order.shipping_address_id = response.address.result.id;

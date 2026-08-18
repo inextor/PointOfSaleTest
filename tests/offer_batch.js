@@ -176,7 +176,7 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 		});
 	}
 
-	function buildOrderPayload(itemId, storeId, qty, unitaryPrice, batch, expirationDate)
+	function buildOrderPayload(itemId, storeId, qty, unitaryPrice, batch, expirationDate, clientName)
 	{
 		var subtotal = Number((qty * unitaryPrice).toFixed(2));
 
@@ -184,7 +184,7 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			order: {
 				billing_data_id: 1,
 				cashier_user_id: 1,
-				client_name: 'PUBLICO GRAL',
+				client_name: clientName || 'PUBLICO GRAL',
 				currency_id: 'MXN',
 				marked_for_billing: null,
 				note: null,
@@ -298,7 +298,7 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.ok(offer.id, 'Oferta por lote creada id=' + offer.id);
 			assert.equal(offer.batch, batchB, 'Oferta guarda el lote');
 
-			const orderA = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchA, expA));
+			const orderA = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchA, expA, 'PERCENT_DISCOUNT por lote: aplica solo al lote correcto'));
 			const appliedA = await applyOffers(bearer, orderA.order.id, [offer.id]);
 			const reloadedA = await fetchOrder(bearer, orderA.order.id);
 			const itemA = firstItem(reloadedA);
@@ -306,7 +306,7 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.equal(itemA.offer_id, null, 'Item del lote A no tiene oferta');
 			assert.equal(Number(itemA.unitary_price), 100, 'Precio del lote A sin descuento');
 
-			const orderB = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchB, expB));
+			const orderB = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchB, expB, 'PERCENT_DISCOUNT por lote: aplica solo al lote correcto'));
 			const appliedB = await applyOffers(bearer, orderB.order.id, [offer.id]);
 			const reloadedB = await fetchOrder(bearer, orderB.order.id);
 			const itemB = firstItem(reloadedB);
@@ -346,7 +346,7 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.ok(offer.id, 'Oferta por cantidad creada id=' + offer.id);
 			assert.equal(offer.batch, batchB, 'Oferta guarda el lote');
 
-			const orderA = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchA, exp));
+			const orderA = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchA, exp, 'AMOUNT_DISCOUNT por lote: descuenta cantidad solo al lote correcto'));
 			const appliedA = await applyOffers(bearer, orderA.order.id, [offer.id]);
 			const reloadedA = await fetchOrder(bearer, orderA.order.id);
 			const itemA = firstItem(reloadedA);
@@ -354,7 +354,7 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.equal(itemA.offer_id, null, 'Item del lote A no tiene oferta');
 			assert.equal(Number(itemA.unitary_price), 100, 'Precio del lote A sin descuento');
 
-			const orderB = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchB, exp));
+			const orderB = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchB, exp, 'AMOUNT_DISCOUNT por lote: descuenta cantidad solo al lote correcto'));
 			const appliedB = await applyOffers(bearer, orderB.order.id, [offer.id]);
 			const reloadedB = await fetchOrder(bearer, orderB.order.id);
 			const itemB = firstItem(reloadedB);
@@ -400,14 +400,14 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.ok(offer.id, 'Oferta por caducidad creada id=' + offer.id);
 			assert.equal(offer.expiration_days, 30, 'Oferta guarda los dias de caducidad');
 
-			const orderFar = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchFar, daysFromNow(400)));
+			const orderFar = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchFar, daysFromNow(400), 'PERCENT_DISCOUNT por caducidad (dias): aplica solo a caducidad proxima'));
 			const appliedFar = await applyOffers(bearer, orderFar.order.id, [offer.id]);
 			const reloadedFar = await fetchOrder(bearer, orderFar.order.id);
 			const itemFar = firstItem(reloadedFar);
 			assert.ok(!appliedFar, 'No se aplico la oferta a caducidad lejana');
 			assert.equal(itemFar.offer_id, null, 'Item de caducidad lejana sin oferta');
 
-			const orderNear = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchNear, daysFromNow(10)));
+			const orderNear = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchNear, daysFromNow(10), 'PERCENT_DISCOUNT por caducidad (dias): aplica solo a caducidad proxima'));
 			const appliedNear = await applyOffers(bearer, orderNear.order.id, [offer.id]);
 			const reloadedNear = await fetchOrder(bearer, orderNear.order.id);
 			const itemNear = firstItem(reloadedNear);
@@ -447,14 +447,14 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.ok(offer.id, 'Oferta MXN creada id=' + offer.id);
 			assert.equal(offer.type, 'N_X_M', 'Oferta es MXN');
 
-			const orderA = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchA, exp));
+			const orderA = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchA, exp, 'N_X_M por lote: regala solo items del lote correcto'));
 			const appliedA = await applyOffers(bearer, orderA.order.id, [offer.id]);
 			const reloadedA = await fetchOrder(bearer, orderA.order.id);
 			const itemA = firstItem(reloadedA);
 			assert.ok(!appliedA, 'No se aplico MXN al lote distinto');
 			assert.equal(itemA.is_free_of_charge, 'NO', 'Item del lote A no es gratis');
 
-			const orderB = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchB, exp));
+			const orderB = await createOrder(bearer, buildOrderPayload(item.id, storeId, 2, 100, batchB, exp, 'N_X_M por lote: regala solo items del lote correcto'));
 			const appliedB = await applyOffers(bearer, orderB.order.id, [offer.id]);
 			const reloadedB = await fetchOrder(bearer, orderB.order.id);
 			assert.ok(appliedB, 'Se aplico MXN al lote correcto');

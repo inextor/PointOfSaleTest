@@ -79,7 +79,7 @@ QUnit.test('auto-assign bank_account via store_bank_account on payment', async f
 	const orderInfo = await apiRequest('/order_info.php', {
 		method: 'POST',
 		bearer: session.bearer,
-		body: backendSaleOrderPayload(itemIds, session.user.id)
+		body: backendSaleOrderPayload(itemIds, session.user.id, 'auto-assign bank_account via store_bank_account on payment')
 	});
 	assert.ok(orderInfo.order && orderInfo.order.id, 'order created id=' + orderInfo.order.id);
 
@@ -124,7 +124,7 @@ QUnit.test('explicit bank_account_id in bank_movement payload', async function(a
 	const orderInfo = await apiRequest('/order_info.php', {
 		method: 'POST',
 		bearer: session.bearer,
-		body: backendSaleOrderPayload(itemIds, session.user.id)
+		body: backendSaleOrderPayload(itemIds, session.user.id, 'explicit bank_account_id in bank_movement payload')
 	});
 	assert.ok(orderInfo.order && orderInfo.order.id, 'order created');
 
@@ -165,7 +165,7 @@ QUnit.test('bank_movement queryable via bank_movement.php GET', async function(a
 	const orderInfo = await apiRequest('/order_info.php', {
 		method: 'POST',
 		bearer: session.bearer,
-		body: backendSaleOrderPayload(itemIds, session.user.id)
+		body: backendSaleOrderPayload(itemIds, session.user.id, 'bank_movement queryable via bank_movement.php GET')
 	});
 
 	var payload = paymentPayload(orderInfo.order.id, orderInfo.order.total, session.user.id);
@@ -287,7 +287,7 @@ QUnit.test('store bank account assignment before sales', async function(assert) 
 	var orderInfo = await apiRequest('/order_info.php', {
 		method: 'POST',
 		bearer: session.bearer,
-		body: backendSaleOrderPayload(itemIds, session.user.id)
+		body: backendSaleOrderPayload(itemIds, session.user.id, 'store bank account assignment before sales')
 	});
 	assert.ok(orderInfo.order && orderInfo.order.id, 'order created');
 
@@ -342,7 +342,7 @@ QUnit.test('set checkpoint on bank movement and verify balance recalculation', a
 	var order1 = await apiRequest('/order_info.php', {
 		method: 'POST',
 		bearer: session.bearer,
-		body: backendSaleOrderPayload(itemIds1, session.user.id)
+		body: backendSaleOrderPayload(itemIds1, session.user.id, 'set checkpoint on bank movement and verify balance recalculation')
 	});
 	var payment1 = await apiRequest('/payment_info.php', {
 		method: 'POST',
@@ -357,7 +357,7 @@ QUnit.test('set checkpoint on bank movement and verify balance recalculation', a
 	var order2 = await apiRequest('/order_info.php', {
 		method: 'POST',
 		bearer: session.bearer,
-		body: backendSaleOrderPayload(itemIds2, session.user.id)
+		body: backendSaleOrderPayload(itemIds2, session.user.id, 'set checkpoint on bank movement and verify balance recalculation')
 	});
 	var payment2 = await apiRequest('/payment_info.php', {
 		method: 'POST',
@@ -441,7 +441,7 @@ QUnit.test('checkpoint non-numeric balance', async function(assert) {
 	var orderInfo = await apiRequest('/order_info.php', {
 		method: 'POST',
 		bearer: session.bearer,
-		body: backendSaleOrderPayload(itemIds, session.user.id)
+		body: backendSaleOrderPayload(itemIds, session.user.id, 'checkpoint non-numeric balance')
 	});
 	var paymentInfo = await apiRequest('/payment_info.php', {
 		method: 'POST',
