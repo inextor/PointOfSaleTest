@@ -806,7 +806,7 @@ QUnit.test('full order supports the three commission assignment forms', function
 
 	QUnit.test('per-item commission_generation created on generate_commission_bills', async function(assert) {
 		assert.timeout(60000);
-		assert.expect(6);
+		assert.expect(7);
 
 		const session = await login();
 		const storeId = Number(session.user.store_id || testConfig.storeId);
