@@ -1,9 +1,9 @@
 QUnit.module('Oferta por Lote / Caducidad', function()
 {
-	async function createBatchItem(bearer, name)
+	async function createBatchItem(bearer, name, applicableTax)
 	{
 		return getOrCreateItem(bearer, {
-			applicable_tax: 'DEFAULT',
+			applicable_tax: applicableTax || 'DEFAULT',
 			availability_type: 'ON_STOCK',
 			batch_option: 'BATCH_AND_EXPIRATION',
 			clave_sat: '53111603',
@@ -38,6 +38,13 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 	{
 		return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
 	}
+
+	const BATCH_A    = 'POSTEST-A';
+	const BATCH_B    = 'POSTEST-B';
+	const BATCH_X    = 'POSTEST-X';
+	const BATCH_Y    = 'POSTEST-Y';
+	const BATCH_FAR  = 'POSTEST-FAR';
+	const BATCH_NEAR = 'POSTEST-NEAR';
 
 	function shortCouponCode(prefix)
 	{
@@ -176,7 +183,7 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 		});
 	}
 
-	function buildOrderPayload(itemId, storeId, qty, unitaryPrice, batch, expirationDate, clientName)
+		function buildOrderPayload(itemId, storeId, qty, unitaryPrice, batch, expirationDate, clientName)
 	{
 		var subtotal = Number((qty * unitaryPrice).toFixed(2));
 
@@ -235,6 +242,64 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 		};
 	}
 
+		function buildMixedBatchOrderPayload(itemId, storeId, unitaryPrice, batches, clientName)
+		{
+			var totalQty = batches.reduce(function(sum, b) { return sum + Number(b.qty); }, 0);
+			var subtotal = Number((totalQty * unitaryPrice).toFixed(2));
+
+			return {
+				order: {
+					billing_data_id: 1,
+					cashier_user_id: 1,
+					client_name: clientName || 'PUBLICO GRAL',
+					currency_id: 'MXN',
+					marked_for_billing: null,
+					note: null,
+					paid_status: null,
+					price_type_id: 1,
+					service_type: 'QUICK_SALE',
+					status: 'PENDING',
+					store_id: storeId,
+					sync_id: storeId + '-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
+					subtotal: 0,
+					tax: 0,
+					tax_percent: 0,
+					total: 0,
+					discount: 0
+				},
+				items: [
+					{
+						order_item: {
+							item_id: itemId,
+							delivery_status: 'PENDING',
+							stock_status: 'IN_STOCK',
+							tax_included: 'NO',
+							delivered_qty: 0,
+							status: 'ACTIVE',
+							commanda_status: 'NOT_DISPLAYED',
+							item_group: Date.now(),
+							return_required: 'NO',
+							is_item_extra: 'NO',
+							is_free_of_charge: 'NO',
+							note: '',
+							qty: totalQty,
+							item_option_qty: 1,
+							paid_qty: 0,
+							original_unitary_price: unitaryPrice,
+							unitary_price: unitaryPrice,
+							subtotal: subtotal,
+							discount: 0,
+							discount_percent: 0,
+							tax: 0,
+							total: subtotal,
+							preparation_status: 'PENDING'
+						},
+						batches: batches
+					}
+				]
+			};
+		}
+
 	async function createOrder(bearer, payload)
 	{
 		var response = await apiRequest('/order_info.php', {
@@ -286,8 +351,8 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.ok(true, 'Login ok');
 
 			const item = await createBatchItem(bearer, 'Test Offer Item 1');
-			const batchA = randomBatch('A');
-			const batchB = randomBatch('B');
+			const batchA = BATCH_A;
+			const batchB = BATCH_B;
 			const expA = '2099-01-01';
 			const expB = '2099-01-01';
 
@@ -335,8 +400,8 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.ok(true, 'Login ok');
 
 			const item = await createBatchItem(bearer, 'Test Offer Item 2');
-			const batchA = randomBatch('A');
-			const batchB = randomBatch('B');
+			const batchA = BATCH_A;
+			const batchB = BATCH_B;
 			const exp = '2099-01-01';
 
 			await addBatchStock(bearer, item.id, storeId, batchA, exp, 20);
@@ -383,8 +448,8 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.ok(true, 'Login ok');
 
 			const item = await createBatchItem(bearer, 'Test Offer Item 3');
-			const batchFar = randomBatch('FAR');
-			const batchNear = randomBatch('NEAR');
+			const batchFar = BATCH_FAR;
+			const batchNear = BATCH_NEAR;
 			const today = new Date();
 			const daysFromNow = function(n)
 			{
@@ -436,8 +501,8 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 			assert.ok(true, 'Login ok');
 
 			const item = await createBatchItem(bearer, 'Test Offer Item 4');
-			const batchA = randomBatch('A');
-			const batchB = randomBatch('B');
+			const batchA = BATCH_A;
+			const batchB = BATCH_B;
 			const exp = '2099-01-01';
 
 			await addBatchStock(bearer, item.id, storeId, batchA, exp, 20);
@@ -473,6 +538,148 @@ QUnit.module('Oferta por Lote / Caducidad', function()
 		{
 			console.log('Error completo:', JSON.stringify(error));
 			assert.ok(false, 'Fallo test MXN por lote: ' + (error.error || error.message || JSON.stringify(error)));
+		}
+	});
+
+	QUnit.test('PERCENT_DISCOUNT por lote mezclado: divide el order_item en dos', async (assert) =>
+	{
+		assert.expect(16);
+
+		try
+		{
+			const { bearer, user } = await login();
+			const storeId = Number(user.store_id || 1);
+			assert.ok(true, 'Login ok');
+
+			const item = await createBatchItem(bearer, 'Test Offer Mixed Percent');
+			const batchX = BATCH_X;
+			const batchY = BATCH_Y;
+			const exp = '2099-01-01';
+
+			await addBatchStock(bearer, item.id, storeId, batchX, exp, 20);
+			await addBatchStock(bearer, item.id, storeId, batchY, exp, 20);
+
+			const offer = await createPercentOfferByBatch(bearer, item.id, batchX, 50);
+			assert.ok(offer.id, 'Oferta por lote creada id=' + offer.id);
+			assert.equal(offer.batch, batchX, 'Oferta guarda el lote');
+
+			const payload = buildMixedBatchOrderPayload(item.id, storeId, 100,
+				[
+					{ batch: batchX, expiration_date: exp, qty: 4 },
+					{ batch: batchY, expiration_date: exp, qty: 6 }
+				],
+				'PERCENT_DISCOUNT por lote mezclado');
+			const order = await createOrder(bearer, payload);
+			const applied = await applyOffers(bearer, order.order.id, [offer.id]);
+			assert.ok(applied, 'Se aplico la oferta al lote mezclado');
+
+			const reloaded = await fetchOrder(bearer, order.order.id);
+			assert.equal(reloaded.items.length, 2, 'El order_item se dividio en dos');
+
+			const discounted = reloaded.items.find(i => i.order_item.offer_id == offer.id);
+			const normal = reloaded.items.find(i => i.order_item.offer_id == null);
+
+			assert.ok(discounted, 'Existe linea con la oferta');
+			assert.equal(Number(discounted.order_item.qty), 4, 'Linea descontada qty=4');
+			assert.equal(Number(discounted.order_item.unitary_price), 50, 'Linea descontada 50%');
+
+			assert.ok(normal, 'Existe linea sin oferta');
+			assert.equal(Number(normal.order_item.qty), 6, 'Linea normal qty=6');
+			assert.equal(Number(normal.order_item.unitary_price), 100, 'Linea normal sin descuento');
+
+			const totalQty = Number(discounted.order_item.qty) + Number(normal.order_item.qty);
+			assert.equal(totalQty, 10, 'La suma de cantidades se conserva (10)');
+
+			const taxPercent = Number(reloaded.order.tax_percent) || 0;
+			const expectedTotal = Math.round((4 * 50 + 6 * 100) * (1 + taxPercent / 100) * 100) / 100;
+			assert.ok(Math.abs(Number(reloaded.order.total) - expectedTotal) < 0.01, 'Total = base con impuesto (' + taxPercent + '%) = ' + expectedTotal);
+
+			const paymentInfo = await apiRequest('/payment_info.php', {
+				method: 'POST',
+				bearer: bearer,
+				body: paymentPayload(order.order.id, reloaded.order.total, user.id)
+			});
+			assert.ok(paymentInfo.payment && paymentInfo.payment.id, 'Orden pagada (ciclo completo)');
+
+			const paid = await fetchOrder(bearer, order.order.id);
+			assert.equal(paid.order.status, 'CLOSED', 'La orden queda CERRADA tras el pago');
+			assert.ok(Math.abs(Number(paid.order.amount_paid) - expectedTotal) < 0.01, 'El monto pagado igual al total con impuesto');
+		}
+		catch(error)
+		{
+			console.log('Error completo:', JSON.stringify(error));
+			assert.ok(false, 'Fallo test PERCENT por lote mezclado: ' + (error.error || error.message || JSON.stringify(error)));
+		}
+	});
+
+	QUnit.test('AMOUNT_DISCOUNT por lote mezclado: divide el order_item en dos', async (assert) =>
+	{
+		assert.expect(16);
+
+		try
+		{
+			const { bearer, user } = await login();
+			const storeId = Number(user.store_id || 1);
+			assert.ok(true, 'Login ok');
+
+			const item = await createBatchItem(bearer, 'Test Offer Mixed Amount');
+			const batchX = BATCH_X;
+			const batchY = BATCH_Y;
+			const exp = '2099-01-01';
+
+			await addBatchStock(bearer, item.id, storeId, batchX, exp, 20);
+			await addBatchStock(bearer, item.id, storeId, batchY, exp, 20);
+
+			const offer = await createAmountOfferByBatch(bearer, item.id, batchX, 20);
+			assert.ok(offer.id, 'Oferta por cantidad creada id=' + offer.id);
+			assert.equal(offer.batch, batchX, 'Oferta guarda el lote');
+
+			const payload = buildMixedBatchOrderPayload(item.id, storeId, 100,
+				[
+					{ batch: batchX, expiration_date: exp, qty: 4 },
+					{ batch: batchY, expiration_date: exp, qty: 6 }
+				],
+				'AMOUNT_DISCOUNT por lote mezclado');
+			const order = await createOrder(bearer, payload);
+			const applied = await applyOffers(bearer, order.order.id, [offer.id]);
+			assert.ok(applied, 'Se aplico la oferta al lote mezclado');
+
+			const reloaded = await fetchOrder(bearer, order.order.id);
+			assert.equal(reloaded.items.length, 2, 'El order_item se dividio en dos');
+
+			const discounted = reloaded.items.find(i => i.order_item.offer_id == offer.id);
+			const normal = reloaded.items.find(i => i.order_item.offer_id == null);
+
+			assert.ok(discounted, 'Existe linea con la oferta');
+			assert.equal(Number(discounted.order_item.qty), 4, 'Linea descontada qty=4');
+			assert.equal(Number(discounted.order_item.unitary_price), 80, 'Linea descontada 20 de descuento');
+
+			assert.ok(normal, 'Existe linea sin oferta');
+			assert.equal(Number(normal.order_item.qty), 6, 'Linea normal qty=6');
+			assert.equal(Number(normal.order_item.unitary_price), 100, 'Linea normal sin descuento');
+
+			const totalQty = Number(discounted.order_item.qty) + Number(normal.order_item.qty);
+			assert.equal(totalQty, 10, 'La suma de cantidades se conserva (10)');
+
+			const taxPercent = Number(reloaded.order.tax_percent) || 0;
+			const expectedTotal = Math.round((4 * 80 + 6 * 100) * (1 + taxPercent / 100) * 100) / 100;
+			assert.ok(Math.abs(Number(reloaded.order.total) - expectedTotal) < 0.01, 'Total = base con impuesto (' + taxPercent + '%) = ' + expectedTotal);
+
+			const paymentInfo = await apiRequest('/payment_info.php', {
+				method: 'POST',
+				bearer: bearer,
+				body: paymentPayload(order.order.id, reloaded.order.total, user.id)
+			});
+			assert.ok(paymentInfo.payment && paymentInfo.payment.id, 'Orden pagada (ciclo completo)');
+
+			const paid = await fetchOrder(bearer, order.order.id);
+			assert.equal(paid.order.status, 'CLOSED', 'La orden queda CERRADA tras el pago');
+			assert.ok(Math.abs(Number(paid.order.amount_paid) - expectedTotal) < 0.01, 'El monto pagado igual al total con impuesto');
+		}
+		catch(error)
+		{
+			console.log('Error completo:', JSON.stringify(error));
+			assert.ok(false, 'Fallo test AMOUNT por lote mezclado: ' + (error.error || error.message || JSON.stringify(error)));
 		}
 	});
 });

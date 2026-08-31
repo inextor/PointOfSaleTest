@@ -753,7 +753,7 @@ QUnit.test('full order supports the three commission assignment forms', function
 
 	QUnit.test('agent fallback uses cashier when client has no agent', async function(assert) {
 		assert.timeout(60000);
-		assert.expect(5);
+		assert.expect(6);
 
 		const session = await login();
 		const storeId = Number(session.user.store_id || testConfig.storeId);
