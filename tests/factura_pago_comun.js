@@ -452,6 +452,9 @@ QUnit.module('facturar_pago_comun.php & PER_PAYMENT Facturacion', function() {
 
 			// La orden NO se cancela - queda para inspeccion manual (como Factura / Nota de Credito)
 			console.log('Factura PER_PAYMENT completa - orden conservada id=' + order.id + ' pagos=' + paymentIds.join(',') + ' facturas=' + satFacturaIds.join(','));
+			// Mostrar ID de orden de forma visible en el reporte QUnit (final success) para verificar en la UI POS
+			assert.ok(true, 'ORDEN CREADA ID=' + order.id + ' - Ver en POS: ViewOrder /order_info.php?id=' + order.id);
+			assert.ok(true, 'Pagos: ' + paymentIds.join(',') + ' | SAT facturas: ' + satFacturaIds.join(',') + ' - Copiar ID ' + order.id + ' para verificar botones PDF/XML en POS');
 		} catch (e) {
 			console.error(e);
 			assert.ok(false, 'FAIL: ' + (e.response && e.response.error || e.message || JSON.stringify(e)));
