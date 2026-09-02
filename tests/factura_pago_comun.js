@@ -174,11 +174,13 @@ QUnit.module('facturar_pago_comun.php & PER_PAYMENT Facturacion', function() {
 		assert.timeout(30000);
 		try {
 			var s = await login();
-			var item1 = await createPerPaymentTestItem(s.bearer, 'Test Item A ' + Date.now(), 100);
-			var item2 = await createPerPaymentTestItem(s.bearer, 'Test Item B ' + Date.now(), 200);
+			var ts = Date.now();
+			var item1 = await createPerPaymentTestItem(s.bearer, 'Test Item A ' + ts, 100);
+			var item2 = await createPerPaymentTestItem(s.bearer, 'Test Item B ' + ts, 200);
 
-			var order = await createOrderWithMode(s.bearer, [item1.id, item2.id], [100, 200], 'PER_PAYMENT', 'TEST PER_PAYMENT CLIENT');
-			assert.ok(order && order.id, 'Order created with id: ' + order.id);
+			var order = await createOrderWithMode(s.bearer, [item1.id, item2.id], [100, 200], 'PER_PAYMENT', 'Order creation PER_PAYMENT - ' + ts);
+			assert.ok(order && order.id, 'Order created with id: ' + order.id + ' client_name=' + order.client_name);
+			assert.ok(order.client_name && order.client_name.indexOf('Order creation') === 0, 'order client_name is descriptive, not PUBLICO GRAL: ' + order.client_name);
 
 			// Retrieve order via order_info.php
 			var orderInfoResponse = await apiRequest('/order_info.php?id=' + order.id, {
@@ -193,8 +195,8 @@ QUnit.module('facturar_pago_comun.php & PER_PAYMENT Facturacion', function() {
 			assert.ok(Array.isArray(orderInfo.payment_facturas), 'order_info includes payment_facturas array');
 			assert.equal(orderInfo.payment_facturas.length, 0, 'payment_facturas is empty before payments are invoiced');
 
-			// Cleanup
-			await cancelTestOrder(s.bearer, order.id, 'QUnit cleanup');
+			// No se cancela - queda para inspeccion (facturacion test)
+			assert.ok(true, 'ORDEN CONSERVADA ID=' + order.id + ' client_name=' + orderData.client_name);
 		} catch (e) {
 			console.error(e);
 			assert.ok(false, 'FAIL: ' + (e.response && e.response.error || e.message));
@@ -206,8 +208,9 @@ QUnit.module('facturar_pago_comun.php & PER_PAYMENT Facturacion', function() {
 		assert.timeout(30000);
 		try {
 			var s = await login();
-			var item = await createPerPaymentTestItem(s.bearer, 'Test Guard Item ' + Date.now(), 150);
-			var order = await createOrderWithMode(s.bearer, [item.id], [150], 'PER_PAYMENT');
+			var ts = Date.now();
+			var item = await createPerPaymentTestItem(s.bearer, 'Test Guard Item ' + ts, 150);
+			var order = await createOrderWithMode(s.bearer, [item.id], [150], 'PER_PAYMENT', 'Guard facturar.php PER_PAYMENT - ' + ts);
 
 			try {
 				await apiRequest('/facturar.php?id=' + order.id, {
@@ -220,7 +223,9 @@ QUnit.module('facturar_pago_comun.php & PER_PAYMENT Facturacion', function() {
 					'facturar.php rejected PER_PAYMENT order with expected guard error: ' + msg);
 			}
 
-			await cancelTestOrder(s.bearer, order.id, 'QUnit cleanup');
+			assert.ok(order.client_name && order.client_name.indexOf('Guard') === 0, 'order client_name descriptive: ' + order.client_name);
+			// No se cancela - queda para inspeccion
+			assert.ok(true, 'ORDEN CONSERVADA ID=' + order.id + ' client_name=' + order.client_name);
 		} catch (e) {
 			console.error(e);
 			assert.ok(false, 'FAIL: ' + (e.response && e.response.error || e.message));
@@ -232,8 +237,9 @@ QUnit.module('facturar_pago_comun.php & PER_PAYMENT Facturacion', function() {
 		assert.timeout(30000);
 		try {
 			var s = await login();
-			var item = await createPerPaymentTestItem(s.bearer, 'Test Full Guard ' + Date.now(), 100);
-			var order = await createOrderWithMode(s.bearer, [item.id], [100], 'FULL');
+			var ts = Date.now();
+			var item = await createPerPaymentTestItem(s.bearer, 'Test Full Guard ' + ts, 100);
+			var order = await createOrderWithMode(s.bearer, [item.id], [100], 'FULL', 'Guard FULL no PER_PAYMENT - ' + ts);
 
 			// Create payment for FULL order
 			var paymentBody = paymentPayload(order.id, 100, s.user ? s.user.id : 1);
@@ -245,6 +251,7 @@ QUnit.module('facturar_pago_comun.php & PER_PAYMENT Facturacion', function() {
 
 			var paymentObj = Array.isArray(paymentResp) ? paymentResp[0] : (paymentResp.payment || paymentResp);
 			assert.ok(paymentObj && paymentObj.id, 'Payment created for FULL order id: ' + paymentObj.id);
+			assert.ok(order.client_name && order.client_name.indexOf('Guard') === 0, 'order client_name descriptive: ' + order.client_name);
 
 			try {
 				await apiRequest('/facturar_pago_comun.php', {
@@ -259,7 +266,8 @@ QUnit.module('facturar_pago_comun.php & PER_PAYMENT Facturacion', function() {
 					'facturar_pago_comun rejected FULL order payment with expected guard error: ' + msg);
 			}
 
-			await cancelTestOrder(s.bearer, order.id, 'QUnit cleanup');
+			// No se cancela - queda para inspeccion
+			assert.ok(true, 'ORDEN CONSERVADA ID=' + order.id + ' client_name=' + order.client_name + ' payment=' + paymentObj.id);
 		} catch (e) {
 			console.error(e);
 			assert.ok(false, 'FAIL: ' + (e.response && e.response.error || e.message));
@@ -271,9 +279,10 @@ QUnit.module('facturar_pago_comun.php & PER_PAYMENT Facturacion', function() {
 		assert.timeout(30000);
 		try {
 			var s = await login();
-			var item1 = await createPerPaymentTestItem(s.bearer, 'Test Abono Item 1 ' + Date.now(), 100);
-			var item2 = await createPerPaymentTestItem(s.bearer, 'Test Abono Item 2 ' + Date.now(), 200);
-			var order = await createOrderWithMode(s.bearer, [item1.id, item2.id], [100, 200], 'PER_PAYMENT');
+			var ts = Date.now();
+			var item1 = await createPerPaymentTestItem(s.bearer, 'Test Abono Item 1 ' + ts, 100);
+			var item2 = await createPerPaymentTestItem(s.bearer, 'Test Abono Item 2 ' + ts, 200);
+			var order = await createOrderWithMode(s.bearer, [item1.id, item2.id], [100, 200], 'PER_PAYMENT', 'Payment flow PER_PAYMENT 120 - ' + ts);
 
 			// Apply partial payment of $120
 			var paymentBody = paymentPayload(order.id, 120, s.user ? s.user.id : 1);
@@ -285,6 +294,7 @@ QUnit.module('facturar_pago_comun.php & PER_PAYMENT Facturacion', function() {
 
 			var paymentObj = Array.isArray(paymentResp) ? paymentResp[0] : (paymentResp.payment || paymentResp);
 			assert.ok(paymentObj && paymentObj.id, 'Partial payment created with id: ' + paymentObj.id);
+			assert.ok(order.client_name && order.client_name.indexOf('Payment flow') === 0, 'order client_name descriptive: ' + order.client_name);
 
 			// Check order status
 			var orderInfoResponse = await apiRequest('/order_info.php?id=' + order.id, {
@@ -307,7 +317,8 @@ QUnit.module('facturar_pago_comun.php & PER_PAYMENT Facturacion', function() {
 			assert.ok(pInfo, 'Payment info returned');
 			assert.equal(pInfo.sat_factura, null, 'sat_factura is null before invoicing');
 
-			await cancelTestOrder(s.bearer, order.id, 'QUnit cleanup');
+			// No se cancela - queda para inspeccion
+			assert.ok(true, 'ORDEN CONSERVADA ID=' + order.id + ' client_name=' + orderData.client_name + ' payment=' + paymentObj.id);
 		} catch (e) {
 			console.error(e);
 			assert.ok(false, 'FAIL: ' + (e.response && e.response.error || e.message));
