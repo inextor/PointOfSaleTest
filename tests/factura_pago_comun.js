@@ -361,25 +361,57 @@ QUnit.module('facturar_pago_comun.php & PER_PAYMENT Facturacion', function() {
 							sat_serie: perPaymentTestConfig.serie
 						}
 					});
-					assert.ok(invoiceResult.success, 'Abono ' + (i + 1) + ' facturado success: ' + JSON.stringify(invoiceResult).slice(0, 200));
+					assert.ok(invoiceResult.success, 'Abono ' + (i + 1) + ' facturado success: ' + JSON.stringify(invoiceResult).slice(0, 300));
 					assert.ok(invoiceResult.sat_factura_id, 'Abono ' + (i + 1) + ' sat_factura_id=' + invoiceResult.sat_factura_id);
 					assert.ok(invoiceResult.uuid, 'Abono ' + (i + 1) + ' uuid=' + invoiceResult.uuid);
+					// La UI (ViewOrderComponent) muestra botones PDF/XML solo si hay attachment ids
+					assert.ok(invoiceResult.xml_attachment_id, 'Abono ' + (i + 1) + ' xml_attachment_id=' + invoiceResult.xml_attachment_id + ' (necesario para boton XML)');
+					// pdf_attachment_id es opcional pero idealmente existe; si falta es warning, no fallo duro
+					if (!invoiceResult.pdf_attachment_id) {
+						console.warn('Abono ' + (i + 1) + ' sin pdf_attachment_id - el boton PDF no aparecera, revisar generarPDF/Sicofi');
+					} else {
+						assert.ok(invoiceResult.pdf_attachment_id, 'Abono ' + (i + 1) + ' pdf_attachment_id=' + invoiceResult.pdf_attachment_id);
+					}
 					satFacturaIds.push(invoiceResult.sat_factura_id);
 
-					// Verificar que el pago quedo facturado
+					// Verificar sat_factura directo - debe tener xml_attachment_id (y pdf si se genero)
+					var sfResp = await apiRequest('/sat_factura.php?id=' + invoiceResult.sat_factura_id, { bearer: s.bearer });
+					var sf = sfResp.sat_factura || sfResp;
+					assert.ok(sf && sf.id, 'sat_factura ' + invoiceResult.sat_factura_id + ' existe');
+					assert.ok(sf.uuid, 'sat_factura uuid=' + sf.uuid);
+					assert.ok(sf.xml_attachment_id, 'sat_factura xml_attachment_id=' + sf.xml_attachment_id + ' - sin esto no hay boton XML');
+					if (sf.pdf_attachment_id) {
+						assert.ok(sf.pdf_attachment_id, 'sat_factura pdf_attachment_id=' + sf.pdf_attachment_id);
+					} else {
+						console.warn('sat_factura ' + sf.id + ' sin pdf_attachment_id - revisar generarPDF, pero xml ya permite factura');
+					}
+					// Verificar tipo correcto para facturacion por abono
+					assert.ok(sf.type === 'PAGO_PARCIAL' || sf.type === 'NORMAL', 'sat_factura type=' + sf.type);
+
+					// Verificar que el pago quedo facturado y vinculado al sat_factura con xml
 					var pInfo = await apiRequest('/payment_info.php', {
 						method: 'POST',
 						bearer: s.bearer,
 						body: { _post_search: 1, id: paymentObj.id }
 					});
 					var pRow = Array.isArray(pInfo.data) ? pInfo.data[0] : (Array.isArray(pInfo) ? pInfo[0] : pInfo);
-					// pRow puede venir como objeto plano con sat_factura_id
-					var pSatId = pRow.sat_factura_id || (pRow.payment && pRow.payment.sat_factura_id) || invoiceResult.sat_factura_id;
+					var payData = pRow.payment || pRow;
+					var pSatId = payData.sat_factura_id || pRow.sat_factura_id || invoiceResult.sat_factura_id;
 					assert.ok(pSatId, 'Pago ' + (i + 1) + ' vinculado a sat_factura ' + pSatId);
+					assert.equal(Number(pSatId), Number(sf.id), 'payment.sat_factura_id coincide con sat_factura.id');
+					assert.ok(payData.sat_xml_attachment_id || sf.xml_attachment_id, 'payment sat_xml_attachment_id presente (payment=' + (payData.sat_xml_attachment_id||'null') + ' sf=' + sf.xml_attachment_id + ')');
+					assert.equal(payData.facturado, 'YES', 'payment.facturado=YES tras timbrar');
 				} catch (e) {
 					var msg = (e.response && e.response.error) || e.message || '';
-					// En entorno sin PAC configurado, el error viene del subsistema de facturacion pero debe ser reportado limpio
-					assert.ok(msg.length > 0, 'Abono ' + (i + 1) + ' PAC invocado y error manejado: ' + msg);
+					console.error('Fallo facturacion abono ' + (i + 1) + ':', msg, e.response||e);
+					// Si PAC no timbra, sat_factura quedara sin uuid/xml - hacer fallar explicito para que se note la falta de botones
+					var failDetail = msg;
+					try {
+						var pendingSf = await apiRequest('/sat_factura.php?payment_id=' + paymentObj.id, { bearer: s.bearer });
+						var pr = pendingSf.data ? pendingSf.data[0] : pendingSf;
+						if (pr) failDetail += ' | sat_factura id=' + (pr.id||pr.sat_factura&&pr.sat_factura.id) + ' xml=' + (pr.xml_attachment_id||'null');
+					} catch(_){}
+					assert.ok(false, 'Abono ' + (i + 1) + ' no se pudo timbrar - sin xml no habra boton XML/PDF: ' + failDetail);
 				}
 
 				// Verificar estado intermedio de la orden
@@ -399,15 +431,24 @@ QUnit.module('facturar_pago_comun.php & PER_PAYMENT Facturacion', function() {
 			var fData = fInfo.order || fInfo;
 			assert.equal(Number(fData.amount_paid), 300, 'Orden totalmente pagada 300');
 			assert.equal(fData.paid_status, 'PAID', 'Orden paid_status=PAID');
-			// facturado debe ser YES solo si todas las facturas se timbraron; si PAC fallo, al menos verificar payment_facturas
-			if (satFacturaIds.length === abonos.length) {
-				assert.equal(fData.facturado, 'YES', 'Orden facturado=YES tras cubrir total con abonos facturados');
-			} else {
-				assert.ok(true, 'Orden facturacion parcial: ' + satFacturaIds.length + '/' + abonos.length + ' abonos timbrados (PAC puede no estar configurado)');
-			}
+			assert.equal(fData.facturado, 'YES', 'Orden facturado=YES tras cubrir total con abonos facturados');
 			assert.ok(Array.isArray(fInfo.payment_facturas), 'order_info incluye payment_facturas');
-			// payment_facturas debe contener tantas entradas como abonos facturados exitosamente
-			assert.ok(fInfo.payment_facturas.length >= satFacturaIds.length, 'payment_facturas contiene ' + fInfo.payment_facturas.length + ' facturas (esperado >= ' + satFacturaIds.length + ')');
+			assert.equal(fInfo.payment_facturas.length, abonos.length, 'payment_facturas contiene ' + abonos.length + ' facturas (una por abono)');
+			// Cada payment_factura debe tener xml (y pdf si se genero) para que la UI muestre botones
+			fInfo.payment_facturas.forEach(function(pf, idx){
+				var pfData = pf.sat_factura || pf;
+				assert.ok(pfData.xml_attachment_id || pf.xml_attachment_id, 'payment_factura ' + (idx+1) + ' xml_attachment_id presente - boton XML visible');
+				if (!pfData.pdf_attachment_id && !pf.pdf_attachment_id) {
+					console.warn('payment_factura ' + (idx+1) + ' sin pdf_attachment_id - boton PDF no aparecera');
+				}
+				assert.ok(pfData.uuid || pf.uuid, 'payment_factura ' + (idx+1) + ' uuid presente');
+			});
+			// Verificar todas las sat_facturas del pedido tienen xml
+			for (var k=0;k<satFacturaIds.length;k++) {
+				var checkSf = await apiRequest('/sat_factura.php?id=' + satFacturaIds[k], { bearer: s.bearer });
+				var csf = checkSf.sat_factura || checkSf;
+				assert.ok(csf.xml_attachment_id, 'sat_factura ' + satFacturaIds[k] + ' xml_attachment_id presente para descarga XML');
+			}
 
 			// La orden NO se cancela - queda para inspeccion manual (como Factura / Nota de Credito)
 			console.log('Factura PER_PAYMENT completa - orden conservada id=' + order.id + ' pagos=' + paymentIds.join(',') + ' facturas=' + satFacturaIds.join(','));
