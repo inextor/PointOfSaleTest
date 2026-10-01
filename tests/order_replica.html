@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Replica Ordenes RMCELL - QUnit Tests</title>
+<link rel="stylesheet" href="../qunit/qunit-2.18.1.css">
+<style>
+body { font-family: Arial, sans-serif; margin: 16px; }
+.controls { margin: 0 0 16px; padding: 12px; border: 1px solid #c8d1dc; border-radius: 4px; }
+.controls p { margin: 0 0 8px; font-size: 13px; color: #374151; }
+label { display: block; margin: 8px 0 4px; font-weight: 600; }
+input { width: min(560px, 100%); padding: 7px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.row > div { flex: 1; min-width: 220px; }
+</style>
+</head>
+<body>
+<div class="controls">
+	<p><strong>Pruebas RMCELL</strong> (23 ordenes al 16% + orden 169326 de Comex al 8% +
+	duplicado 169326 sin redondeo). Cada test crea su orden con valores exactos,
+	paga, cierra y timbra CFDI. Se puede correr cuantas veces se quiera; cada
+	corrida crea ordenes nuevas.</p>
+	<label for="endpoint">API endpoint (destino)</label>
+	<input id="endpoint">
+	<div class="row">
+		<div>
+			<label for="or-billing">billing_data_id (16%, autorizado)</label>
+			<input id="or-billing" value="12">
+		</div>
+		<div>
+			<label for="or-serie">Serie</label>
+			<input id="or-serie" value="A">
+		</div>
+	</div>
+	<div class="row">
+		<div><label for="or-razon">Razon social receptor</label><input id="or-razon" value="GRUPO JFTI SOLUCIONES"></div>
+		<div><label for="or-rfc">RFC receptor</label><input id="or-rfc" value="GJS1410232N4"></div>
+		<div><label for="or-email">Email receptor</label><input id="or-email" value="integranet@integranet.xyz"></div>
+	</div>
+	<div class="row">
+		<div><label for="or-cp">Domicilio fiscal (CP)</label><input id="or-cp" value="22887"></div>
+		<div><label for="or-regimen">Regimen fiscal</label><input id="or-regimen" value="626"></div>
+		<div><label for="or-capital">Regimen capital</label><input id="or-capital" value="626"></div>
+	</div>
+	<div class="row">
+		<div><label for="or-uso">Uso CFDI</label><input id="or-uso" value="G03"></div>
+		<div><label for="or-forma">Forma de pago</label><input id="or-forma" value="01"></div>
+	</div>
+	<div>
+		<label><input type="checkbox" id="or-facturar" checked style="width:auto"> Timbrar CFDI</label>
+		<label><input type="checkbox" id="or-rounding" style="width:auto"> apply_rounding_discount_adjustment</label>
+	</div>
+</div>
+<div id="qunit"></div>
+<div id="qunit-fixture"></div>
+<script src="../qunit/qunit-2.18.1.js"></script>
+<script src="../environment.js"></script>
+<script src="../test_utils.js"></script>
+<script>
+document.getElementById('endpoint').value = end_point;
+document.getElementById('endpoint').addEventListener('change', function() {
+	var val = this.value.trim().replace(/\/+$/, '');
+	if (val && !/^https?:\/\//i.test(val)) val = 'https://' + val;
+	end_point = val;
+});
+</script>
+<script src="rmcell_orders_data.js"></script>
+<script src="order_replica.js?v=2"></script>
+</body>
+</html>

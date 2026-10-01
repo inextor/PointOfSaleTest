@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Export Ordenes RMCELL - QUnit Tests</title>
+<link rel="stylesheet" href="../qunit/qunit-2.18.1.css">
+<style>
+body { font-family: Arial, sans-serif; margin: 16px; }
+.controls { margin: 0 0 16px; padding: 12px; border: 1px solid #c8d1dc; border-radius: 4px; }
+label { display: block; margin: 8px 0 4px; font-weight: 600; }
+input { width: min(560px, 100%); padding: 7px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.row > div { flex: 1 1 120px; }
+.row input { width: 100%; box-sizing: border-box; }
+#oe-output { width: 100%; min-height: 220px; margin-top: 8px; font-family: monospace; }
+button { margin-top: 8px; padding: 8px 14px; }
+</style>
+</head>
+<body>
+<div class="controls">
+	<label for="endpoint">API endpoint (origen)</label>
+	<input id="endpoint">
+	<div class="row">
+		<div><label for="oe-limit">limit</label><input id="oe-limit" value="5"></div>
+		<div><label for="oe-store">storeId (vacio = todas)</label><input id="oe-store" value="23"></div>
+		<div><label for="oe-tax">taxPercent</label><input id="oe-tax" value="16"></div>
+		<div><label for="oe-min">minId</label><input id="oe-min" value="0"></div>
+	</div>
+	<label for="oe-output">JSON exportado</label>
+	<textarea id="oe-output" readonly placeholder="Corre el test para exportar"></textarea>
+	<br>
+	<button id="oe-download" type="button">Descargar JSON</button>
+</div>
+<div id="qunit"></div>
+<div id="qunit-fixture"></div>
+<script src="../qunit/qunit-2.18.1.js"></script>
+<script src="../environment.js"></script>
+<script src="../test_utils.js"></script>
+<script>
+document.getElementById('endpoint').value = end_point;
+document.getElementById('endpoint').addEventListener('change', function() {
+	var val = this.value.trim().replace(/\/+$/, '');
+	if (val && !/^https?:\/\//i.test(val)) {
+		val = 'https://' + val;
+	}
+	end_point = val;
+});
+window.oeReadConfig = function() {
+	function num(id, fallback) {
+		var v = Number(document.getElementById(id).value);
+		return isFinite(v) ? v : fallback;
+	}
+	var storeRaw = document.getElementById('oe-store').value.trim();
+	return {
+		limit: num('oe-limit', 5),
+		storeId: storeRaw === '' ? 0 : Number(storeRaw),
+		taxPercent: num('oe-tax', 16),
+		minId: num('oe-min', 0)
+	};
+};
+document.getElementById('oe-download').addEventListener('click', function() {
+	var json = window.oeLastExport || document.getElementById('oe-output').value;
+	if (!json) return;
+	var blob = new Blob([json], { type: 'application/json' });
+	var a = document.createElement('a');
+	a.href = URL.createObjectURL(blob);
+	a.download = 'rmcell_orders_export.json';
+	document.body.appendChild(a);
+	a.click();
+	setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+});
+</script>
+<script src="order_export.js"></script>
+</body>
+</html>
