@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Factura 179047 (8%) - QUnit Tests</title>
+<link rel="stylesheet" href="../qunit/qunit-2.18.1.css">
+<style>
+body { font-family: Arial, sans-serif; margin: 16px; }
+.controls { margin: 0 0 16px; padding: 12px; border: 1px solid #c8d1dc; border-radius: 4px; }
+.controls p { margin: 0 0 8px; font-size: 13px; color: #374151; }
+label { display: block; margin: 8px 0 4px; font-weight: 600; }
+input { width: min(560px, 100%); padding: 7px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.row > div { flex: 1; min-width: 220px; }
+</style>
+</head>
+<body>
+<div class="controls">
+	<p><strong>Replica de la orden 179047</strong> (CAMINO 6, IVA 8% fronterizo):
+	4 articulos Comex con los importes exactos de la orden real, cerrada a
+	credito (forma 99) y timbrada tal cual. Se puede correr cuantas veces se
+	quiera; cada corrida crea su orden nueva y su CFDI.</p>
+	<label for="endpoint">API endpoint (destino)</label>
+	<input id="endpoint">
+	<div class="row">
+		<div>
+			<label for="f179-billing">billing_data_id (autorizado)</label>
+			<input id="f179-billing" value="3">
+		</div>
+		<div>
+			<label for="f179-serie">Serie (CMNO solo con PAC real; el demo no la tiene dada de alta)</label>
+			<input id="f179-serie" value="A">
+		</div>
+	</div>
+	<div class="row">
+		<div><label for="f179-razon">Razon social receptor</label><input id="f179-razon" value="GEODE SECO"></div>
+		<div><label for="f179-rfc">RFC receptor</label><input id="f179-rfc" value="GSE980910QF5"></div>
+		<div><label for="f179-email">Email receptor</label><input id="f179-email" value="tania.osorio@secoprecision.com"></div>
+	</div>
+	<div class="row">
+		<div><label for="f179-cp">Domicilio fiscal (CP)</label><input id="f179-cp" value="21430"></div>
+		<div><label for="f179-regimen">Regimen fiscal</label><input id="f179-regimen" value="601"></div>
+		<div><label for="f179-capital">Regimen capital</label><input id="f179-capital" value="601"></div>
+	</div>
+	<div class="row">
+		<div><label for="f179-uso">Uso CFDI</label><input id="f179-uso" value="G03"></div>
+		<div><label for="f179-forma">Forma de pago</label><input id="f179-forma" value="99"></div>
+	</div>
+	<div>
+		<label><input type="checkbox" id="f179-facturar" checked style="width:auto"> Timbrar CFDI</label>
+		<label><input type="checkbox" id="f179-rounding" style="width:auto"> apply_rounding_discount_adjustment</label>
+	</div>
+</div>
+<div id="qunit"></div>
+<div id="qunit-fixture"></div>
+<script src="../qunit/qunit-2.18.1.js"></script>
+<script src="../environment.js"></script>
+<script src="../test_utils.js"></script>
+<script>
+document.getElementById('endpoint').value = end_point;
+document.getElementById('endpoint').addEventListener('change', function() {
+	var val = this.value.trim().replace(/\/+$/, '');
+	if (val && !/^https?:\/\//i.test(val)) val = 'https://' + val;
+	end_point = val;
+});
+</script>
+<script src="factura_179047.js"></script>
+</body>
+</html>
