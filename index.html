@@ -10,6 +10,9 @@ header { background: #1a1a2e; color: #fff; padding: 24px 32px; }
 header h1 { font-size: 22px; font-weight: 600; }
 header p { font-size: 13px; opacity: 0.7; margin-top: 4px; }
 .container { max-width: 720px; margin: 32px auto; padding: 0 16px; }
+.section { font-size: 17px; font-weight: 600; margin: 28px 0 4px; }
+.section:first-child { margin-top: 0; }
+.section-desc { font-size: 12px; color: #6b7280; margin-bottom: 12px; }
 .modules { display: grid; gap: 12px; }
 .card { display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 16px 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); text-decoration: none; color: inherit; transition: box-shadow .15s, transform .15s; }
 .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); transform: translateY(-1px); }
@@ -27,6 +30,54 @@ header p { font-size: 13px; opacity: 0.7; margin-top: 4px; }
 	<p>Select a test module to run, or run all tests</p>
 </header>
 <div class="container">
+	<h2 class="section">Facturas</h2>
+	<p class="section-desc">Todo lo relacionado con CFDI y factura</p>
+	<div class="modules">
+		<a class="card" href="tests/quote_facturacion.html">
+			<div>
+				<div class="name">Quote Facturacion</div>
+				<div class="desc">Replica 12236 al 16%: cotizacion, orden y factura respetando precio unitario o total exacto</div>
+			</div>
+			<span class="arrow">&#9654;</span>
+		</a>
+		<a class="card" href="tests/factura_truncado.html">
+			<div>
+				<div class="name">Factura Truncado 16%</div>
+				<div class="desc">Total truncado vs redondeo: subtotal 100.04 al 16% timbra 116.04</div>
+			</div>
+			<span class="arrow">&#9654;</span>
+		</a>
+		<a class="card" href="tests/quote_replica_12349.html">
+			<div>
+				<div class="name">Quote Replica 12349 (8%)</div>
+				<div class="desc">Replica exacta de la cotizacion 12349: 3 articulos Comex, IVA 8% fronterizo, hasta CFDI</div>
+			</div>
+			<span class="arrow">&#9654;</span>
+		</a>
+		<a class="card" href="tests/factura_credito.html">
+			<div>
+				<div class="name">Factura / Nota de Credito</div>
+				<div class="desc">Credit CFDI 99 with batch item, Nota de credito flow with non-stock item</div>
+			</div>
+			<span class="arrow">&#9654;</span>
+		</a>
+		<a class="card" href="tests/factura_pago_comun.html">
+			<div>
+				<div class="name">Factura Pago Común (PER_PAYMENT)</div>
+				<div class="desc">Per-payment CFDI Tipo I, item allocation, guards, order_info payment_facturas</div>
+			</div>
+			<span class="arrow">&#9654;</span>
+		</a>
+		<a class="card" href="tests/order_replica.html">
+			<div>
+				<div class="name">Replica Ordenes RMCELL</div>
+				<div class="desc">Pruebas RMCELL al 16% y 8%: orden exacta, pago, cierre y CFDI + duplicado 169326 sin redondeo</div>
+			</div>
+			<span class="arrow">&#9654;</span>
+		</a>
+	</div>
+	<h2 class="section">Gral Tests</h2>
+	<p class="section-desc">Pruebas sin relacion con CFDI o factura</p>
 	<div class="modules">
 		<a class="card" href="tests/store_bank_account.html">
 			<div>
@@ -49,27 +100,6 @@ header p { font-size: 13px; opacity: 0.7; margin-top: 4px; }
 			</div>
 			<span class="arrow">&#9654;</span>
 		</a>
-		<a class="card" href="tests/quote_facturacion.html">
-			<div>
-				<div class="name">Quote Facturacion</div>
-				<div class="desc">Replica 12236 al 16%: cotizacion, orden y factura respetando precio unitario o total exacto</div>
-			</div>
-			<span class="arrow">&#9654;</span>
-		</a>
-		<a class="card" href="tests/factura_truncado.html">
-			<div>
-				<div class="name">Factura Truncado 16%</div>
-				<div class="desc">Total truncado vs redondeo: subtotal 100.04 al 16% timbra 116.04</div>
-			</div>
-			<span class="arrow">&#9654;</span>
-		</a>
-		<a class="card" href="tests/quote_replica_12349.html">
-			<div>
-				<div class="name">Quote Replica 12349 (8%)</div>
-				<div class="desc">Replica exacta de la cotizacion 12349: 3 articulos Comex, IVA 8% fronterizo, hasta CFDI</div>
-			</div>
-			<span class="arrow">&#9654;</span>
-		</a>
 		<a class="card" href="tests/consignment.html">
 			<div>
 				<div class="name">Delivered Consignment</div>
@@ -77,17 +107,17 @@ header p { font-size: 13px; opacity: 0.7; margin-top: 4px; }
 			</div>
 			<span class="arrow">&#9654;</span>
 		</a>
-		<a class="card" href="tests/factura_credito.html">
-			<div>
-				<div class="name">Factura / Nota de Credito</div>
-				<div class="desc">Credit CFDI 99 with batch item, Nota de credito flow with non-stock item</div>
-			</div>
-			<span class="arrow">&#9654;</span>
-		</a>
 		<a class="card" href="tests/commission.html">
 			<div>
 				<div class="name">Commission Rules</div>
 				<div class="desc">Unit tests, full report flow, zero commission, manual adjustment</div>
+			</div>
+			<span class="arrow">&#9654;</span>
+		</a>
+		<a class="card" href="tests/order_agent.html">
+			<div>
+				<div class="name">Order Agent (Comision por Venta)</div>
+				<div class="desc">Agent defaults, explicit assignment, update_order_agent permissions, closed/cancelled guards</div>
 			</div>
 			<span class="arrow">&#9654;</span>
 		</a>
@@ -119,17 +149,10 @@ header p { font-size: 13px; opacity: 0.7; margin-top: 4px; }
 			</div>
 			<span class="arrow">&#9654;</span>
 		</a>
-		<a class="card" href="tests/factura_pago_comun.html">
+		<a class="card" href="tests/stock_deduction_timing.html">
 			<div>
-				<div class="name">Factura Pago Común (PER_PAYMENT)</div>
-				<div class="desc">Per-payment CFDI Tipo I, item allocation, guards, order_info payment_facturas</div>
-			</div>
-			<span class="arrow">&#9654;</span>
-		</a>
-		<a class="card" href="tests/order_replica.html">
-			<div>
-				<div class="name">Replica Ordenes RMCELL</div>
-				<div class="desc">Pruebas RMCELL al 16% y 8%: orden exacta, pago, cierre y CFDI + duplicado 169326 sin redondeo</div>
+				<div class="name">Stock Deduction Timing</div>
+				<div class="desc">Venta normal descuenta al vender; pedido especial (PICK_UP + fecha) solo al entregar</div>
 			</div>
 			<span class="arrow">&#9654;</span>
 		</a>
