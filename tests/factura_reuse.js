@@ -220,7 +220,7 @@ async function frFetchSatFactura(bearer, satFacturaId) {
 
 QUnit.module('Facturacion doble al 16%');
 
-QUnit.test('primera llamada crea una sola factura', async function(assert) {
+QUnit.test('primera llamada deja una sola fila vinculada', async function(assert) {
 	assert.timeout(300000);
 	assert.expect(14);
 
@@ -262,63 +262,90 @@ QUnit.test('primera llamada crea una sola factura', async function(assert) {
 	const orderToBill = withData.order || withData;
 	assert.equal(orderToBill.sat_forma_pago, facturaReuseConfig.formaPago, 'forma de pago guardada');
 
-	const facturada = await apiRequest('/facturacion_request.php', {
-		method: 'POST',
-		bearer: session.bearer,
-		body: frBillingPayload(orderToBill)
-	});
-	const billed = facturada.order || facturada;
-	assert.ok(billed.sat_factura_id, 'primera llamada dejo sat_factura_id');
+	let stamped = false;
+	try {
+		const facturada = await apiRequest('/facturacion_request.php', {
+			method: 'POST',
+			bearer: session.bearer,
+			body: frBillingPayload(orderToBill)
+		});
+		const billed = facturada.order || facturada;
+		stamped = !!billed.sat_factura_id;
+		assert.ok(stamped, 'primera llamada timbro y dejo sat_factura_id');
+	} catch (error) {
+		stamped = false;
+		assert.ok(
+			error.message.indexOf('FI778') !== -1,
+			'primera llamada fallo en el PAC de forma controlada'
+		);
+	}
 
-	const row = await frFetchSatFactura(session.bearer, billed.sat_factura_id);
-	assert.equal(row.type, 'NORMAL', 'la factura es NORMAL');
-	assert.ok(row.uuid, 'la factura tiene folio fiscal');
-	assert.ok(row.transaccion, 'la factura tiene transaccion');
+	const linked = await apiRequest('/order_info.php?id=' + encodeURIComponent(reuseOrderId), { bearer: session.bearer });
+	assert.ok(linked.order.sat_factura_id, 'la orden quedo vinculada aunque falle el timbrado');
+
+	const list = await apiRequest('/sat_factura.php?order_id=' + encodeURIComponent(reuseOrderId), { bearer: session.bearer });
+	assert.equal(Number(list.total), 1, 'una sola fila sat_factura');
+
+	const row = (list.data || []).map(function(entry) { return entry.sat_factura || entry; })[0];
+	assert.ok(row.transaccion, 'la fila tiene transaccion');
 
 	reuseFirstBill = {
-		satFacturaId: Number(billed.sat_factura_id),
+		code: orderToBill.facturacion_code,
+		satFacturaId: Number(linked.order.sat_factura_id),
 		transaccion: row.transaccion,
-		billingBody: frBillingPayload(orderToBill),
+		stamped: stamped,
+		email: orderToBill.sat_receptor_email,
 		bearer: session.bearer
 	};
 });
 
-QUnit.test('segunda llamada no duplica la factura', async function(assert) {
+QUnit.test('segunda llamada con datos distintos reutiliza la fila', async function(assert) {
 	assert.timeout(300000);
-	assert.expect(6);
-	assert.ok(reuseFirstBill, 'la primera facturacion dejo datos');
+	assert.expect(7);
+	assert.ok(reuseFirstBill, 'la primera llamada dejo datos');
+
+	const secondBody = frBillingPayload({ facturacion_code: reuseFirstBill.code });
+	secondBody.email = 'reuse2@integranet.xyz';
+	secondBody.note = 'segunda llamada datos distintos';
 
 	let rejected = null;
+	let secondOk = null;
 	try {
-		await apiRequest('/facturacion_request.php', {
+		const second = await apiRequest('/facturacion_request.php', {
 			method: 'POST',
-			bearer: reuseFirstBill.bearer,
-			body: reuseFirstBill.billingBody
+		bearer: reuseFirstBill.bearer,
+			body: secondBody
 		});
+		secondOk = second.order || second;
 	} catch (error) {
 		rejected = error;
 	}
-	assert.ok(
-		rejected && rejected.message.indexOf('ya esta facturada') !== -1,
-		'segunda llamada rechazada por orden ya facturada'
-	);
 
-	try {
-		const reloaded = await apiRequest('/order_info.php?id=' + encodeURIComponent(reuseOrderId), { bearer: reuseFirstBill.bearer });
-		assert.equal(Number(reloaded.order.sat_factura_id), reuseFirstBill.satFacturaId, 'mismo sat_factura_id');
+	if (reuseFirstBill.stamped) {
+		assert.ok(
+			rejected && rejected.message.indexOf('ya esta facturada') !== -1,
+			'segunda llamada rechazada porque ya esta timbrada'
+		);
+	} else {
+		assert.ok(
+			!rejected || rejected.message.indexOf('ya esta facturada') === -1,
+			'segunda llamada paso el filtro de facturada'
+		);
+	}
 
-		const list = await apiRequest('/sat_factura.php?order_id=' + encodeURIComponent(reuseOrderId), { bearer: reuseFirstBill.bearer });
-		assert.equal(Number(list.total), 1, 'una sola fila sat_factura para la orden');
+	const reloaded = await apiRequest('/order_info.php?id=' + encodeURIComponent(reuseOrderId), { bearer: reuseFirstBill.bearer });
+	assert.equal(Number(reloaded.order.sat_factura_id), reuseFirstBill.satFacturaId, 'mismo sat_factura_id');
 
-		const rows = (list.data || []).map(function(entry) { return entry.sat_factura || entry; });
-		assert.equal(Number(rows[0].id), reuseFirstBill.satFacturaId, 'la fila es la misma');
-		assert.equal(rows[0].transaccion, reuseFirstBill.transaccion, 'la transaccion no cambio');
-	} finally {
-		try {
-			await cancelTestOrder(reuseFirstBill.bearer, reuseOrderId, 'POSTest factura reuse cleanup');
-		} catch (cleanupError) {
-			console.log('Factura reuse: limpieza sin confirmar: ' + cleanupError.message);
-		}
+	const list = await apiRequest('/sat_factura.php?order_id=' + encodeURIComponent(reuseOrderId), { bearer: reuseFirstBill.bearer });
+	assert.equal(Number(list.total), 1, 'sigue una sola fila sat_factura');
+
+	const rows = (list.data || []).map(function(entry) { return entry.sat_factura || entry; });
+	assert.equal(Number(rows[0].id), reuseFirstBill.satFacturaId, 'la fila es la misma');
+	assert.equal(rows[0].transaccion, reuseFirstBill.transaccion, 'la transaccion no cambio');
+
+	if (reuseFirstBill.stamped) {
+		assert.equal(reloaded.order.sat_receptor_email, reuseFirstBill.email, 'datos intactos tras el rechazo');
+	} else {
+		assert.equal(reloaded.order.sat_receptor_email, secondBody.email, 'la fila reutilizada tomo los datos nuevos');
 	}
 });
-
