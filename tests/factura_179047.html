@@ -18,15 +18,19 @@ input { width: min(560px, 100%); padding: 7px; }
 <div class="controls">
 	<p><strong>Replica de la orden 179047</strong> (CAMINO 6, IVA 8% fronterizo):
 	4 articulos Comex con los importes exactos de la orden real, cerrada a
-	credito (forma 99) y timbrada tal cual. Se puede correr cuantas veces se
+	credito (forma 99) y timbrada tal cual. Incluye ademas la
+	<strong>replica de la orden 189647</strong> (EL REFUGIO 8, IVA 8%): un
+	renglon con 20% de descuento e IVA 50.64, pagada en efectivo (forma 01,
+	563.00) e intento de CFDI. Incluye ademas la
+	<strong>replica de la orden 192889</strong> (AEROPUERTO 3, IVA 8%): un
+	renglon con 20% de descuento e IVA 157.93, pagada con debito (forma 28,
+	195.80) e intento de CFDI. Se puede correr cuantas veces se
 	quiera; cada corrida crea su orden nueva y su CFDI.</p>
 	<label for="endpoint">API endpoint (destino)</label>
 	<input id="endpoint">
+	<p>billing_data canonico 8% precision 2: fronterizodemo625@mail.com.
+	Se resuelve solo, sin ids manuales.</p>
 	<div class="row">
-		<div>
-			<label for="f179-billing">billing_data_id (autorizado)</label>
-			<input id="f179-billing" value="3">
-		</div>
 		<div>
 			<label for="f179-serie">Serie (CMNO solo con PAC real; el demo no la tiene dada de alta)</label>
 			<input id="f179-serie" value="A">

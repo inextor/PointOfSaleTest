@@ -4,7 +4,8 @@
 // valores viajan iguales, minimo el precio unitario.
 const quoteFacturacionTestConfig = {
 	storeId: 1, // CEDIS: 16% y DESGLOSADA (la creacion fuerza el impuesto del almacen)
-	billingDataId: 12, // deseado: copia demo de billing_data 1 con precision 2 (6 decimales rompe sumas del PAC). No existe en todas las bases: qfResolveBillingDataId lo obtiene o lo crea antes de facturar.
+	billingDataId: 12, // legado: qfResolveBillingDataId ahora resuelve el
+	// canonico 16% precision 2 (demo1@sicofi.com.mx) sin usar este id.
 	taxPercent: 16,
 	priceTypeId: 1,
 	serie: 'A',
@@ -302,64 +303,13 @@ function qfRowHasDemoPac(row) {
 	});
 }
 
-// El test necesita un billing_data con precision 2 autorizado ante el PAC demo
-// (la fila 1 es precision 6 y rompe las sumas del PAC). El id configurado no
-// existe en todas las bases: enviarlo tal cual hace fallar datos_facturacion
-// con error de llave foranea (order_ibfk_12) o facturacion_request con "no se
-// encontraron los datos de facturacion". Aqui se obtiene el objeto que cumple
-// el requisito y, si no existe en esta base, se crea como copia con precision 2.
+// billing_data canonico 16% a precision 2 (la fila precision 6 rompe las
+// sumas del PAC): cuenta demo1@sicofi.com.mx.
+// Politica de solo 2 cuentas PAC (ver resolveCanonicalBillingDataId en
+// test_utils.js): no se usan ids fijos ni copias arbitrarias.
 // No se toca la creacion de cotizacion/orden/pago.
 async function qfResolveBillingDataId(bearer) {
-	const cfg = quoteFacturacionTestConfig;
-
-	try {
-		const response = await apiRequest('/billing_data.php?id=' + encodeURIComponent(cfg.billingDataId), { bearer });
-		const row = response.billing_data || response;
-		if (row && row.id && Number(row.precision) === 2) {
-			return Number(row.id);
-		}
-	}
-	catch (error) {
-		// el billing_data preferido no existe en esta base: se obtiene o crea abajo
-	}
-
-	const list = await apiRequest('/billing_data.php?limit=-1', { bearer });
-	const rows = (list.data || list.result || [])
-		.map(function(r) { return r.billing_data || r; })
-		.filter(function(r) { return r && r.id; });
-
-	if (!rows.length) {
-		throw new Error('Sin billing_data en destino: tabla vacia, imposible timbrar');
-	}
-
-	const precision2 = rows.find(function(r) {
-		return Number(r.precision) === 2 && qfRowHasDemoPac(r);
-	});
-
-	if (precision2) {
-		console.log('Quote facturacion: billing_data ' + cfg.billingDataId + ' no disponible, usando ' + precision2.id + ' (precision 2, PAC demo)');
-		return Number(precision2.id);
-	}
-
-	const source = rows.find(qfRowHasDemoPac) || rows[0];
-	const copy = Object.assign({}, source);
-	['id', 'created', 'updated', 'created_by_user_id', 'updated_by_user_id'].forEach(function(key) {
-		delete copy[key];
-	});
-	copy.precision = 2;
-
-	const created = await apiRequest('/billing_data.php', { method: 'POST', bearer, body: copy });
-	const row = created.billing_data || created;
-
-	if (!row || !row.id) {
-		throw new Error(
-			'No se pudo crear billing_data precision 2 (copia de ' + source.id + '): '
-			+ JSON.stringify(created).slice(0, 300)
-		);
-	}
-
-	console.log('Quote facturacion: billing_data ' + row.id + ' creado (copia de ' + source.id + ' con precision 2, PAC demo)');
-	return Number(row.id);
+	return resolveCanonicalBillingDataId(bearer, { rate: '16', precision: 2 });
 }
 
 async function qfFacturar(orderId, bearer, applyExactTotal) {

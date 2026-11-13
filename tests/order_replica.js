@@ -5,7 +5,8 @@
 // repetir cuantas veces se quiera (cada corrida crea sus propias ordenes
 // nuevas). Ademas define "Prueba RMCELL 169326 sin redondeo", duplicado de la
 // 169326 con valores exactos de precision completa y aserciones exactas.
-var orderReplicaCfdi = { billingDataId: 12, serie: 'A', facturar: true, applyRounding: false,
+var orderReplicaCfdi = { billingDataId: 12, serie: 'A', facturar: true, applyRounding: false, // billingDataId legado
+
 	receiver: { razonSocial: 'GRUPO JFTI SOLUCIONES', email: 'integranet@integranet.xyz',
 		rfc: 'GJS1410232N4', domicilioFiscal: '22887', regimenFiscal: '626',
 		regimenCapital: '626', usoCfdi: 'G03', formaPago: '01' } };
@@ -18,8 +19,8 @@ function orApplyPageConfig() {
 		var el = document.getElementById(id);
 		return el ? el.value.trim() : '';
 	};
-	if (!document.getElementById('or-billing')) return;
-	orderReplicaCfdi.billingDataId = Number(g('or-billing')) || orderReplicaCfdi.billingDataId;
+	if (!document.getElementById('or-serie')) return;
+	// billing_data canonico por tasa via orResolveBillingDataId (sin ids manuales).
 	orderReplicaCfdi.serie = g('or-serie') || orderReplicaCfdi.serie;
 	orderReplicaCfdi.facturar = document.getElementById('or-facturar').checked;
 	orderReplicaCfdi.applyRounding = document.getElementById('or-rounding').checked;
@@ -174,28 +175,18 @@ async function orGetSharedItem(bearer) {
 	return orSharedItem;
 }
 
+// billing_data canonico por tasa a precision 2: 16% demo1@sicofi.com.mx,
+// 8% fronterizodemo625@mail.com. Politica de solo 2 cuentas PAC (ver
+// resolveCanonicalBillingDataId en test_utils.js): sin ids fijos ni filas
+// arbitrarias. La preparacion tampoco debe fallar aqui: el helper crea la
+// combinacion canonica si falta.
 async function orResolveBillingDataId(store, bearer) {
-	var cands = [];
-	if (store && store.default_billing_data_id) cands.push(Number(store.default_billing_data_id));
-	cands.push(Number(orderReplicaCfdi.billingDataId));
-	for (var i = 0; i < cands.length; i++) {
-		if (!cands[i]) continue;
-		try {
-			var r = await apiRequest('/billing_data.php?id=' + cands[i], { bearer: bearer });
-			if ((r.billing_data || r).id) return Number((r.billing_data || r).id);
-		} catch (e) {}
-	}
-	// La preparacion tampoco debe fallar aqui: si el id configurado no
-	// existe en destino, se usa cualquiera disponible (prefiriendo uno con
-	// credenciales PAC para que el timbrado real pueda correr).
-	var list = await apiRequest('/billing_data.php?limit=-1', { bearer: bearer });
-	var rows = (list.data || list.result || []).map(function(r) { return r.billing_data || r; })
-		.filter(function(r) { return r && r.id; });
-	if (!rows.length) throw new Error('Sin billing_data en destino: tabla vacia, imposible timbrar');
-	var withPac = rows.find(function(r) { return r.usuario && r.password; });
-	var pick = withPac || rows[0];
-	console.log('orResolveBillingDataId: usando billing_data ' + pick.id + ' (' + (pick.rfc || '?') + ')');
-	return Number(pick.id);
+	var rate = store && Number(store.tax_percent) === 8 ? '8' : '16';
+	return resolveCanonicalBillingDataId(bearer, {
+		rate: rate,
+		precision: 2,
+		rfc: store && store.rfc
+	});
 }
 
 // El price_type_id de origen puede no existir en destino (FK order_ibfk_10).

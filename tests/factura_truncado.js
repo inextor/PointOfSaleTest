@@ -7,8 +7,8 @@
 // El PAC demo rechaza la tasa 8% de estimulo fronterizo, por eso el caso es al 16%.
 const facturaTruncadoConfig = {
 	storeId: 1, // CEDIS: 16% y DESGLOSADA (igual que quote_facturacion.js)
-	billingDataId: 1, // precision 6 con credenciales PAC demo (hoy solo
-	// timbra a precision 6; ver ftResolveBillingDataId)
+	billingDataId: 1, // legado: ftResolveBillingDataId ahora resuelve el
+	// canonico 16% precision 6 (demo1@sicofi.com.mx) sin usar este id
 	// Renglon como la orden hecha a mano 175545: 100.03 + 16.00 = 116.04,
 	// autoconsistente (el backend lo respeta tal cual, sin recalcular).
 	lineCash: { qty: 1, original: 116.04, unitary: 100.03, subtotal: 100.03, tax: 16.00, total: 116.04 },
@@ -427,69 +427,25 @@ async function ftResolveStore(session, bearer) {
 	);
 }
 
-// billing_data: hoy solo se timbra a precision 6 (las filas precision 2 no
-// las acepta el PAC para este caso). Se prefiere el configurado, luego el
-// default de la sucursal, luego uno con usuario PAC demo, luego cualquiera
-// existente; si la tabla esta vacia se crea uno con las credenciales demo.
-// Cada candidato se verifica con GET porque un id inexistente hace fallar
-// datos_facturacion con error generico.
+// billing_data canonico 16% a precision 6 (las filas precision 2 no las
+// acepta el PAC para este caso): cuenta demo1@sicofi.com.mx.
+// Politica de solo 2 cuentas PAC (ver resolveCanonicalBillingDataId en
+// test_utils.js): no se usan ids fijos ni filas arbitrarias.
 async function ftResolveBillingDataId(store, bearer) {
-	const cfg = facturaTruncadoConfig;
-	const candidates = [Number(cfg.billingDataId)];
-
-	if (store && store.default_billing_data_id) {
-		candidates.push(Number(store.default_billing_data_id));
+	try {
+		return await resolveCanonicalBillingDataId(bearer, {
+			rate: '16',
+			precision: 6,
+			rfc: store && store.rfc
+		});
 	}
-
-	for (const candidate of candidates) {
-		if (!candidate) {
-			continue;
+	catch (error) {
+		// Solo tabla vacia llega aqui: se crea con las credenciales demo 16%.
+		if (/tabla vacia/.test(error.message)) {
+			return ftCreateDemoBillingData(bearer);
 		}
-		try {
-			const response = await apiRequest('/billing_data.php?id=' + encodeURIComponent(candidate), { bearer });
-			const row = response.billing_data || response;
-			if (row && row.id) {
-				if (Number(row.id) !== candidates[0]) {
-					console.log('Factura truncado: billing_data preferido no existe, usando ' + row.id);
-				}
-				return Number(row.id);
-			}
-		}
-		catch (error) {
-			// se intenta el siguiente candidato
-		}
+		throw error;
 	}
-
-	const list = await apiRequest('/billing_data.php?limit=-1', { bearer });
-	const rows = (list.data || list.result || [])
-		.map(function(r) { return r.billing_data || r; })
-		.filter(function(r) { return r && r.id; });
-
-	console.log(
-		'Factura truncado: billing_data disponibles '
-		+ rows.map(function(r) { return r.id + '/' + (r.rfc || '?') + '/' + (r.regimen_fiscal || '?'); }).join(', ')
-	);
-
-	const demo = rows.find(ftRowHasDemoPac);
-	if (demo) {
-		console.log('Factura truncado: usando billing_data ' + demo.id + ' (usuario PAC demo)');
-		return Number(demo.id);
-	}
-
-	const rfcMatch = store && store.rfc
-		? rows.find(function(r) { return r.rfc === store.rfc; })
-		: null;
-	if (rfcMatch) {
-		console.log('Factura truncado: usando billing_data ' + rfcMatch.id + ' (RFC de la sucursal)');
-		return Number(rfcMatch.id);
-	}
-
-	if (rows.length > 0) {
-		console.log('Factura truncado: usando billing_data ' + rows[0].id + ' (cualquiera disponible)');
-		return Number(rows[0].id);
-	}
-
-	return ftCreateDemoBillingData(bearer);
 }
 
 // Tabla vacia: clona la estructura minima con las credenciales PAC demo.

@@ -626,3 +626,88 @@ async function resolveBankAccountForTest(session, storeId) {
 	});
 	return (created && created.bank_account) ? created.bank_account.id : created.id;
 }
+
+// Politica canonica de billing_data: solo existen 2 cuentas PAC autorizadas.
+// - Pruebas al 16%: demo1@sicofi.com.mx / demodemoD
+// - Pruebas al 8% (estimulo fronterizo): fronterizodemo625@mail.com / 12345
+// Cada cuenta se usa en precision 2 y precision 6 segun lo que pida el caso.
+// Los resolvers deben usar resolveCanonicalBillingDataId en vez de ids
+// fijos o de clonar filas arbitrarias, para no proliferar billing_data.
+var billingDataPolicy = {
+	rate16: { usuario: 'demo1@sicofi.com.mx', password: 'demodemoD', label: '16%' },
+	rate8: { usuario: 'fronterizodemo625@mail.com', password: '12345', label: '8%' },
+	precisions: [2, 6]
+};
+
+function billingDataPolicyForRate(rate) {
+	return String(rate) === '8' ? billingDataPolicy.rate8 : billingDataPolicy.rate16;
+}
+
+function billingDataRowUser(row) {
+	return (row && (row.usuario || row.pac_usuario)) || '';
+}
+
+// Resuelve el billing_data canonico para (cuenta PAC + precision [+ RFC]).
+// Reutiliza la fila exacta si existe; si falta la precision, la crea como
+// copia de una fila hermana de la MISMA cuenta (mismo RFC si hay); solo si
+// la cuenta no existe en la base se clona una fila del mismo RFC con la
+// precision pedida cambiando las credenciales a la cuenta canonica.
+// Nunca clona entre cuentas fuera de estos casos: como maximo aparecen las
+// combinaciones 2 x 2 (cuenta x precision) por RFC emisor.
+async function resolveCanonicalBillingDataId(bearer, opts) {
+	opts = opts || {};
+	var pac = billingDataPolicyForRate(opts.rate);
+	var precision = Number(opts.precision) === 6 ? 6 : 2;
+
+	var list = await apiRequest('/billing_data.php?limit=-1', { bearer: bearer });
+	var rows = (list.data || list.result || [])
+		.map(function(r) { return r.billing_data || r; })
+		.filter(function(r) { return r && r.id; });
+
+	if (!rows.length) {
+		throw new Error('Sin billing_data en destino: tabla vacia, imposible timbrar');
+	}
+
+	var own = rows.filter(function(r) {
+		return billingDataRowUser(r) === pac.usuario && Number(r.precision) === precision;
+	});
+	var pick = (opts.rfc && own.find(function(r) { return r.rfc === opts.rfc; })) || own[0] || null;
+	if (pick) {
+		return Number(pick.id);
+	}
+
+	var sibling = rows.find(function(r) {
+		return billingDataRowUser(r) === pac.usuario && (!opts.rfc || r.rfc === opts.rfc);
+	}) || rows.find(function(r) { return billingDataRowUser(r) === pac.usuario; });
+	var template = sibling
+		|| rows.find(function(r) { return opts.rfc && r.rfc === opts.rfc && Number(r.precision) === precision; })
+		|| rows.find(function(r) { return opts.rfc && r.rfc === opts.rfc; })
+		|| rows.find(function(r) { return Number(r.precision) === precision; })
+		|| rows[0];
+
+	var copy = Object.assign({}, template);
+	['id', 'created', 'updated', 'created_by_user_id', 'updated_by_user_id'].forEach(function(key) {
+		delete copy[key];
+	});
+	copy.precision = precision;
+	copy.usuario = pac.usuario;
+	copy.password = pac.password;
+	copy.pac_usuario = pac.usuario;
+	copy.pac_password = pac.password;
+
+	var created = await apiRequest('/billing_data.php', { method: 'POST', bearer: bearer, body: copy });
+	var row = created.billing_data || created;
+
+	if (!row || !row.id) {
+		throw new Error(
+			'No se pudo crear billing_data canonico ' + pac.label + ' precision ' + precision
+			+ ' (cuenta ' + pac.usuario + '): ' + JSON.stringify(created).slice(0, 300)
+		);
+	}
+
+	console.log(
+		'billing_data canonico ' + row.id + ' creado (' + pac.label + ' precision ' + precision
+		+ ', cuenta ' + pac.usuario + ', clon de ' + template.id + ')'
+	);
+	return Number(row.id);
+}

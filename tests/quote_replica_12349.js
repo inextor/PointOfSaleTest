@@ -203,46 +203,15 @@ async function qrResolveStore(session, bearer) {
 	return store;
 }
 
-// Reutiliza un billing_data autorizado: el default de la sucursal, el preferido o
-// cualquiera con el RFC del emisor. Nunca se crea uno nuevo (no tendria credenciales PAC).
+// billing_data canonico 8% a precision 2: cuenta fronterizodemo625@mail.com.
+// Politica de solo 2 cuentas PAC (ver resolveCanonicalBillingDataId en
+// test_utils.js): no se usan ids fijos ni filas arbitrarias.
 async function qrResolveBillingDataId(store, bearer) {
-	const cfg = quoteReplicaTestConfig;
-	const candidates = [];
-
-	if (store && store.default_billing_data_id) {
-		candidates.push(Number(store.default_billing_data_id));
-	}
-	candidates.push(Number(cfg.preferredBillingDataId));
-
-	for (const candidate of candidates) {
-		if (!candidate) {
-			continue;
-		}
-		try {
-			const response = await apiRequest('/billing_data.php?id=' + encodeURIComponent(candidate), { bearer });
-			const row = response.billing_data || response;
-			if (row && row.id) {
-				return Number(row.id);
-			}
-		}
-		catch (error) {
-			// se intenta el siguiente candidato
-		}
-	}
-
-	const response = await apiRequest('/billing_data.php?limit=-1', { bearer });
-	const rows = response.data || response.result || [];
-	const row = rows
-		.map(function(r) { return r.billing_data || r; })
-		.find(function(r) {
-			return r && r.id && (r.rfc === cfg.billingDataRfc || r.regimen_fiscal === cfg.billingDataRegimen);
-		});
-
-	if (row) {
-		return Number(row.id);
-	}
-
-	throw new Error('No se encontro un billing_data autorizado para facturar (revisar billing_data.php)');
+	return resolveCanonicalBillingDataId(bearer, {
+		rate: '8',
+		precision: 2,
+		rfc: store && store.rfc
+	});
 }
 
 async function qrStockOf(itemId, storeId, bearer) {

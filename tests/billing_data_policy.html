@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Billing Data Policy - QUnit Tests</title>
+<link rel="stylesheet" href="../qunit/qunit-2.18.1.css">
+<style>
+body { font-family: Arial, sans-serif; margin: 16px; }
+.controls { margin: 0 0 16px; padding: 12px; border: 1px solid #c8d1dc; border-radius: 4px; }
+.controls p { margin: 0 0 8px; font-size: 13px; color: #374151; }
+label { display: block; margin: 8px 0 4px; font-weight: 600; }
+input { width: min(560px, 100%); padding: 7px; }
+</style>
+</head>
+<body>
+<div class="controls">
+	<p><strong>Politica de billing_data</strong>: solo 2 cuentas PAC
+	(16% demo1@sicofi.com.mx, 8% fronterizodemo625@mail.com) en precision 2
+	y 6. Verifica el inventario sin crear ni borrar filas.</p>
+	<label for="endpoint">API endpoint (destino)</label>
+	<input id="endpoint">
+</div>
+<div id="qunit"></div>
+<div id="qunit-fixture"></div>
+<script src="../qunit/qunit-2.18.1.js"></script>
+<script src="../environment.js"></script>
+<script src="../test_utils.js"></script>
+<script>
+document.getElementById('endpoint').value = end_point;
+document.getElementById('endpoint').addEventListener('change', function() {
+	var val = this.value.trim().replace(/\/+$/, '');
+	if (val && !/^https?:\/\//i.test(val)) val = 'https://' + val;
+	end_point = val;
+});
+</script>
+<script src="billing_data_policy.js"></script>
+</body>
+</html>
