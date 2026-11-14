@@ -458,6 +458,7 @@ async function ftCreateDemoBillingData(bearer) {
 			billing_data: {
 				pac_usuario: ftDemoPacUser,
 				pac_password: ftDemoPacPassword,
+				precision: 6,
 				status: 'ACTIVE'
 			}
 		}

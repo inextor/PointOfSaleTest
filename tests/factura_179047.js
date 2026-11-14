@@ -37,7 +37,7 @@ const factura179047Config = {
 	billingDataRfc: 'ROLH92062346A',
 	receiver: {
 		razonSocial: 'GEODE SECO',
-		email: 'tania.osorio@secoprecision.com',
+		email: 'tania.osorio@integranet.xyz',
 		rfc: 'GSE980910QF5',
 		domicilioFiscal: '21430',
 		regimenFiscal: '601',
@@ -183,13 +183,13 @@ async function f179ResolveStore(bearer) {
 	return found;
 }
 
-// billing_data canonico 8% a precision 2: cuenta fronterizodemo625@mail.com.
+// billing_data canonico 8% a precision 6: cuenta fronterizodemo652@mail.com.
 // Politica de solo 2 cuentas PAC (ver resolveCanonicalBillingDataId en
 // test_utils.js): no se usan ids fijos ni filas arbitrarias.
 async function f179ResolveBillingDataId(store, bearer) {
 	return resolveCanonicalBillingDataId(bearer, {
 		rate: '8',
-		precision: 2,
+		precision: 6,
 		rfc: store && store.rfc
 	});
 }
@@ -702,7 +702,7 @@ const factura189647Config = {
 	preferredBillingDataId: 3,
 	receiver: {
 		razonSocial: 'FELICIDAD ARTISANS',
-		email: 'felicidadartisans@ymail.com',
+		email: 'felicidadartisans@integranet.xyz',
 		rfc: 'FAR091116QF0',
 		domicilioFiscal: '21470',
 		regimenFiscal: '601',
@@ -763,35 +763,11 @@ async function f189ResolveStore(bearer) {
 	return found;
 }
 
-// Cliente de contado como el flujo de la orden (pago en efectivo forma 01):
-// sin credito porque la orden se paga antes de cerrar.
-async function f189CreateClient(storeId, priceTypeId, bearer) {
-	const client = await apiRequest('/user.php', {
-		method: 'POST',
-		bearer,
-		body: {
-			creation_store_id: storeId,
-			credit_days: 0,
-			credit_limit: 0,
-			name: uniqueName('POSTest Factura 189647'),
-			phone: '5214350',
-			price_type_id: priceTypeId,
-			status: 'ACTIVE',
-			type: 'CLIENT'
-		}
-	});
-
-	if (!client.id) {
-		throw new Error('Client creation did not return an id: ' + JSON.stringify(client));
-	}
-
-	return client;
-}
-
 // POST order_info.php con los valores verbatim de la orden 189647 (con
 // descuento de renglon y de orden): OrderUtils::applyPrice rama YES respeta
-// los valores completos.
-async function f189CreateOrder(client, item, store, priceTypeId, bearer, cashierUserId) {
+// los valores completos. Sin cliente asignado: solo viaja el nombre de la
+// orden que se replica (igual que order_replica.js).
+async function f189CreateOrder(item, store, priceTypeId, bearer, cashierUserId) {
 	const cfg = factura189647Config;
 	const line = cfg.lines[0];
 	const group = Date.now();
@@ -804,7 +780,6 @@ async function f189CreateOrder(client, item, store, priceTypeId, bearer, cashier
 				billing_data_id: store.default_billing_data_id || cfg.preferredBillingDataId,
 				cashier_user_id: cashierUserId,
 				client_name: 'POSTest Factura 189647 replica ' + cfg.sourceOrderId,
-				client_user_id: client.id,
 				currency_id: cfg.currencyId,
 				price_type_id: priceTypeId,
 				service_type: 'QUICK_SALE',
@@ -933,13 +908,13 @@ async function f189PayAndClose(orderId, bearer) {
 	return closed;
 }
 
-// billing_data canonico 8% a precision 2 (precision 6 rompe las sumas del
-// PAC): cuenta fronterizodemo625@mail.com. No se toca la orden: sus valores
-// viajan igual. Politica de solo 2 cuentas PAC (ver test_utils.js).
+// billing_data canonico 8% a precision 6: cuenta fronterizodemo652@mail.com.
+// No se toca la orden: sus valores viajan igual.
+// Politica de solo 2 cuentas PAC (ver test_utils.js).
 async function f189ResolveBillingDataId(store, bearer) {
 	return resolveCanonicalBillingDataId(bearer, {
 		rate: '8',
-		precision: 2,
+		precision: 6,
 		rfc: store && store.rfc
 	});
 }
@@ -1042,7 +1017,7 @@ QUnit.test('replica orden 189647 (descuento 20%) e intenta CFDI al 8% forma 01',
 	assert.equal(store.modo_facturacion, 'DESGLOSADA', 'sucursal con facturacion desglosada');
 
 	const billingDataId = await f189ResolveBillingDataId(store, session.bearer);
-	assert.ok(billingDataId, 'billing_data precision 2 autorizado para facturar ' + billingDataId);
+	assert.ok(billingDataId, 'billing_data precision 6 autorizado para facturar ' + billingDataId);
 
 	const priceTypeId = await f179ResolvePriceTypeId(session.bearer, cfg.priceTypeId);
 	assert.ok(priceTypeId, 'price_type resuelto ' + priceTypeId);
@@ -1075,10 +1050,7 @@ QUnit.test('replica orden 189647 (descuento 20%) e intenta CFDI al 8% forma 01',
 	await f179SetStock(item.id, store.id, original + line.qty, session.bearer, 'POSTest factura 189647 inicio');
 
 	try {
-		const client = await f189CreateClient(store.id, priceTypeId, session.bearer);
-		assert.ok(client.id, 'cliente de contado creado ' + client.id);
-
-		const created = await f189CreateOrder(client, item, store, priceTypeId, session.bearer, session.user.id);
+		const created = await f189CreateOrder(item, store, priceTypeId, session.bearer, session.user.id);
 		const orderId = created.order.id;
 		assert.ok(orderId, 'orden creada ' + orderId);
 		assert.equal(Number(created.order.tax_percent), cfg.taxPercent, 'orden al 8%');
@@ -1195,7 +1167,7 @@ const factura192889Config = {
 	preferredBillingDataId: 2,
 	receiver: {
 		razonSocial: 'CAROLINA AMY MADRIGAL PEREZ',
-		email: 'carolinaamymadrigal@gmail.com',
+		email: 'carolinaamymadrigal@integranet.xyz',
 		rfc: 'MAPC980826JI1',
 		domicilioFiscal: '21040',
 		regimenFiscal: '612',
@@ -1256,35 +1228,11 @@ async function f192ResolveStore(bearer) {
 	return found;
 }
 
-// Cliente de contado como el flujo de la orden (pago con debito forma 28):
-// sin credito porque la orden se paga antes de cerrar.
-async function f192CreateClient(storeId, priceTypeId, bearer) {
-	const client = await apiRequest('/user.php', {
-		method: 'POST',
-		bearer,
-		body: {
-			creation_store_id: storeId,
-			credit_days: 0,
-			credit_limit: 0,
-			name: uniqueName('POSTest Factura 192889'),
-			phone: '6461509149',
-			price_type_id: priceTypeId,
-			status: 'ACTIVE',
-			type: 'CLIENT'
-		}
-	});
-
-	if (!client.id) {
-		throw new Error('Client creation did not return an id: ' + JSON.stringify(client));
-	}
-
-	return client;
-}
-
 // POST order_info.php con los valores verbatim de la orden 192889 (con
 // descuento de renglon y de orden): OrderUtils::applyPrice rama YES respeta
-// los valores completos.
-async function f192CreateOrder(client, item, store, priceTypeId, bearer, cashierUserId) {
+// los valores completos. Sin cliente asignado: solo viaja el nombre de la
+// orden que se replica (igual que order_replica.js).
+async function f192CreateOrder(item, store, priceTypeId, bearer, cashierUserId) {
 	const cfg = factura192889Config;
 	const line = cfg.lines[0];
 	const group = Date.now();
@@ -1297,7 +1245,6 @@ async function f192CreateOrder(client, item, store, priceTypeId, bearer, cashier
 				billing_data_id: store.default_billing_data_id || cfg.preferredBillingDataId,
 				cashier_user_id: cashierUserId,
 				client_name: 'POSTest Factura 192889 replica ' + cfg.sourceOrderId,
-				client_user_id: client.id,
 				currency_id: cfg.currencyId,
 				price_type_id: priceTypeId,
 				service_type: 'QUICK_SALE',
@@ -1426,14 +1373,13 @@ async function f192PayAndClose(orderId, bearer) {
 	return closed;
 }
 
-// Igual que la 189647: precision 6 rompe las sumas del PAC con descuento de
-// renglon. billing_data canonico 8% a precision 2: cuenta
-// fronterizodemo625@mail.com. No se toca la orden: sus valores viajan igual.
+// billing_data canonico 8% a precision 6: cuenta fronterizodemo652@mail.com.
+// No se toca la orden: sus valores viajan igual.
 // Politica de solo 2 cuentas PAC (ver test_utils.js).
 async function f192ResolveBillingDataId(store, bearer) {
 	return resolveCanonicalBillingDataId(bearer, {
 		rate: '8',
-		precision: 2,
+		precision: 6,
 		rfc: store && store.rfc
 	});
 }
@@ -1536,7 +1482,7 @@ QUnit.test('replica orden 192889 (descuento 20%) e intenta CFDI al 8% forma 28',
 	assert.equal(store.modo_facturacion, 'DESGLOSADA', 'sucursal con facturacion desglosada');
 
 	const billingDataId = await f192ResolveBillingDataId(store, session.bearer);
-	assert.ok(billingDataId, 'billing_data precision 2 autorizado para facturar ' + billingDataId);
+	assert.ok(billingDataId, 'billing_data precision 6 autorizado para facturar ' + billingDataId);
 
 	const priceTypeId = await f179ResolvePriceTypeId(session.bearer, cfg.priceTypeId);
 	assert.ok(priceTypeId, 'price_type resuelto ' + priceTypeId);
@@ -1569,10 +1515,7 @@ QUnit.test('replica orden 192889 (descuento 20%) e intenta CFDI al 8% forma 28',
 	await f179SetStock(item.id, store.id, original + line.qty, session.bearer, 'POSTest factura 192889 inicio');
 
 	try {
-		const client = await f192CreateClient(store.id, priceTypeId, session.bearer);
-		assert.ok(client.id, 'cliente de contado creado ' + client.id);
-
-		const created = await f192CreateOrder(client, item, store, priceTypeId, session.bearer, session.user.id);
+		const created = await f192CreateOrder(item, store, priceTypeId, session.bearer, session.user.id);
 		const orderId = created.order.id;
 		assert.ok(orderId, 'orden creada ' + orderId);
 		assert.equal(Number(created.order.tax_percent), cfg.taxPercent, 'orden al 8%');
@@ -1669,5 +1612,525 @@ QUnit.test('replica orden 192889 (descuento 20%) e intenta CFDI al 8% forma 28',
 	}
 	finally {
 		await f179SetStock(item.id, store.id, original, session.bearer, 'POSTest factura 192889 restauracion');
+	}
+});
+
+// Replica de la orden 193108 (sucursal SAUZAL 2, IVA 8% fronterizo): 5
+// renglones Comex con los importes exactos de la orden real, sin descuentos,
+// pagada completa (forma 28) e intento de CFDI. El renglon 3 (COMEX 100 PRIM)
+// va al 16% (asi viene en la orden: 245.26 + 39.24 = 284.50); los demas al
+// 8%. Email del receptor en dominio de prueba (el real es hotmail y el CFDI
+// le llegaria al cliente).
+const factura193108Config = {
+	sourceOrderId: 193108,
+	// Sucursal de la orden 193108: SAUZAL, tax_percent 8, modo DESGLOSADA.
+	storeId: 2,
+	taxPercent: 8,
+	priceTypeId: 1,
+	currencyId: 'MXN',
+	// Serie generica 'A': el PAC demo no tiene dada de alta la serie S de la
+	// orden (igual que CMNO en la 179047).
+	serie: 'A',
+	// Solo FK temporal de creacion de la orden; el timbrado usa el canonico.
+	preferredBillingDataId: 2,
+	receiver: {
+		razonSocial: 'ELSA LYDIA SANDOVAL MONTOYA',
+		email: 'transporteelsasandoval@integranet.xyz',
+		rfc: 'SAME680412U14',
+		domicilioFiscal: '22760',
+		regimenFiscal: '612',
+		regimenCapital: '612',
+		usoCfdi: 'G03',
+		formaPago: '28'
+	},
+	lines: [
+		{
+			sourceItemId: 1145,
+			name: 'COLADOR PARA PINTURA DE PAPEL',
+			code: 'H020401',
+			claveSat: '31211900',
+			unit: 'H87',
+			qty: 10,
+			original: 2.5,
+			unitary: 2.31,
+			subtotal: 23.1,
+			tax: 1.85,
+			total: 25,
+			unitaryMeta: 2.5
+		},
+		{
+			sourceItemId: 1712,
+			name: 'COLADOR DE PINTURA DE ALUMINIO',
+			code: 'CA00060',
+			claveSat: '31211915',
+			unit: 'H87',
+			qty: 1,
+			original: 58.5,
+			unitary: 54.17,
+			subtotal: 54.17,
+			tax: 4.33,
+			total: 58.5,
+			unitaryMeta: 58.5
+		},
+		{
+			sourceItemId: 9085,
+			name: 'COMEX 100 PRIM POTENCIADOR RJO 1L',
+			code: '0608971',
+			claveSat: '31211515',
+			unit: 'H87',
+			qty: 1,
+			original: 284.5,
+			unitary: 245.26,
+			subtotal: 245.26,
+			tax: 39.24,
+			total: 284.5,
+			unitaryMeta: 284.5,
+			applicableTax: 'PERCENT',
+			itemTaxPercent: 16
+		},
+		{
+			sourceItemId: 5612,
+			name: 'COMEX THINNER ESTANDAR EPH 4L',
+			code: '0467305',
+			claveSat: '31211800',
+			unit: 'H87',
+			qty: 1,
+			original: 247,
+			unitary: 228.7,
+			subtotal: 228.7,
+			tax: 18.3,
+			total: 247,
+			unitaryMeta: 247
+		},
+		{
+			sourceItemId: 1709,
+			name: 'REPUESTO PARA COLADOR',
+			code: 'CA00094',
+			claveSat: '31211915',
+			unit: 'H87',
+			qty: 1,
+			original: 16.5,
+			unitary: 15.28,
+			subtotal: 15.28,
+			tax: 1.22,
+			total: 16.5,
+			unitaryMeta: 16.5
+		}
+	],
+	// Totales de la orden 193108 (suma de totales de renglon; subtotal + IVA
+	// da 631.45 por redondeo por renglon, 0.05 bajo el total 631.50).
+	orderSubtotal: 566.51,
+	orderTax: 64.94,
+	orderTotal: 631.5,
+	orderDiscount: 0,
+	amountPaid: 631.5
+};
+
+// Resuelve la sucursal al 8%: se prefiere la 2 (SAUZAL, la de la orden) y,
+// solo si no esta disponible al 8% DESGLOSADA, se usa otra ACTIVA igual.
+async function f193ResolveStore(bearer) {
+	const cfg = factura193108Config;
+
+	try {
+		const store = await f179GetStore(cfg.storeId, bearer);
+		if (f179StoreMatches(store)) return store;
+	}
+	catch (error) {
+		console.log('f193ResolveStore: sucursal ' + cfg.storeId + ' no disponible (' + error.message + '), buscando otra al 8%');
+	}
+
+	const list = await apiRequest('/store.php?limit=-1', { bearer });
+	const rows = (list.data || list.result || []).map(function(r) { return r.store || r; });
+	const found = rows.find(function(r) {
+		return r && r.status === 'ACTIVE' && f179StoreMatches(r);
+	});
+
+	if (!found) {
+		throw new Error('No hay sucursal ACTIVA al 8% DESGLOSADA (la orden 193108 es de SAUZAL 2)');
+	}
+
+	console.log('f193ResolveStore: usando sucursal ' + found.id + ' (' + (found.name || '?') + ') en vez de la 2');
+	return found;
+}
+
+// POST order_info.php con los 5 valores verbatim de la orden 193108 (sin
+// descuentos): OrderUtils::applyPrice rama YES respeta los valores completos.
+// Sin cliente asignado: solo viaja el nombre de la orden que se replica
+// (igual que order_replica.js).
+async function f193CreateOrder(items, store, priceTypeId, bearer, cashierUserId) {
+	const cfg = factura193108Config;
+	const group = Date.now();
+
+	const orderInfo = await apiRequest('/order_info.php', {
+		method: 'POST',
+		bearer,
+		body: {
+			order: {
+				billing_data_id: store.default_billing_data_id || cfg.preferredBillingDataId,
+				cashier_user_id: cashierUserId,
+				client_name: 'POSTest Factura 193108 replica ' + cfg.sourceOrderId,
+				currency_id: cfg.currencyId,
+				price_type_id: priceTypeId,
+				service_type: 'QUICK_SALE',
+				status: 'PENDING',
+				store_id: store.id,
+				sync_id: store.id + '-' + Date.now(),
+				subtotal: cfg.orderSubtotal,
+				tax: cfg.orderTax,
+				tax_percent: cfg.taxPercent,
+				total: cfg.orderTotal,
+				discount: cfg.orderDiscount,
+				note: '',
+				facturacion_code: '',
+				sat_serie: cfg.serie,
+				sat_forma_pago: cfg.receiver.formaPago
+			},
+			items: cfg.lines.map(function(line, index) {
+				return {
+					order_item: {
+						item_id: items[index].id,
+						delivery_status: 'PENDING',
+						stock_status: 'IN_STOCK',
+						tax_included: 'YES',
+						delivered_qty: 0,
+						status: 'ACTIVE',
+						commanda_status: 'NOT_DISPLAYED',
+						item_group: group,
+						return_required: 'NO',
+						is_item_extra: 'NO',
+						is_free_of_charge: 'NO',
+						note: '',
+						qty: line.qty,
+						item_option_qty: 1,
+						paid_qty: 0,
+						original_unitary_price: line.original,
+						unitary_price: line.unitary,
+						unitary_price_meta: line.unitaryMeta,
+						subtotal: line.subtotal,
+						discount: 0,
+						discount_percent: 0,
+						tax: line.tax,
+						total: line.total,
+						type: 'NORMAL',
+						preparation_status: 'PENDING'
+					}
+				};
+			})
+		}
+	});
+
+	if (!orderInfo.order || !orderInfo.order.id) {
+		throw new Error('Order creation did not return order.id: ' + JSON.stringify(orderInfo).slice(0, 300));
+	}
+
+	return orderInfo;
+}
+
+// Pago con debito del total (631.50, igual que la orden real) y cierre. El
+// pago total suele cerrar la orden solo; solo se cierra explicito si sigue
+// abierta.
+async function f193PayAndClose(orderId, bearer) {
+	const cfg = factura193108Config;
+
+	const paymentInfo = await apiRequest('/payment_info.php', {
+		method: 'POST',
+		bearer,
+		body: {
+			movements: [
+				{
+					bank_movement: {
+						transaction_type: 'DEBIT_CARD',
+						total: cfg.amountPaid,
+						amount_received: cfg.amountPaid,
+						currency_id: cfg.currencyId,
+						exchange_rate: 1,
+						status: 'ACTIVE',
+						type: 'income'
+					},
+					bank_movement_orders: [
+						{
+							currency_amount: cfg.amountPaid,
+							amount: cfg.amountPaid,
+							currency_id: cfg.currencyId,
+							exchange_rate: 1,
+							status: 'ACTIVE',
+							order_id: orderId
+						}
+					]
+				}
+			],
+			payment: {
+				type: 'income',
+				tag: 'SALE',
+				payment_amount: cfg.amountPaid,
+				received_amount: cfg.amountPaid,
+				change_amount: 0,
+				currency_id: cfg.currencyId,
+				facturado: 'NO',
+				sync_id: '1-' + Date.now()
+			}
+		}
+	});
+
+	if (!paymentInfo.payment || !paymentInfo.payment.id) {
+		throw new Error('Debit payment did not return payment.id: ' + JSON.stringify(paymentInfo).slice(0, 300));
+	}
+
+	let closed = await apiRequest('/order_info.php?id=' + encodeURIComponent(orderId), { bearer });
+
+	if (closed.order.status !== 'CLOSED') {
+		await apiRequest('/updates.php', {
+			method: 'POST',
+			bearer,
+			body: { method: 'closeOrder', order_id: orderId }
+		});
+
+		closed = await apiRequest('/order_info.php?id=' + encodeURIComponent(orderId), { bearer });
+	}
+
+	if (closed.order.status !== 'CLOSED') {
+		throw new Error('Order was not closed, status=' + closed.order.status);
+	}
+
+	closed.payment_id = paymentInfo.payment.id;
+
+	return closed;
+}
+
+// billing_data canonico 8% a precision 6: cuenta fronterizodemo652@mail.com.
+// No se toca la orden: sus valores viajan igual.
+// Politica de solo 2 cuentas PAC (ver test_utils.js).
+async function f193ResolveBillingDataId(store, bearer) {
+	return resolveCanonicalBillingDataId(bearer, {
+		rate: '8',
+		precision: 6,
+		rfc: store && store.rfc
+	});
+}
+
+// Deja la orden y el CFDI a proposito para poder revisarlos en la interfaz
+// (misma convencion que las pruebas 179047, 189647 y 192889).
+async function f193Facturar(orderId, store, billingDataId, bearer) {
+	const cfg = factura193108Config;
+	const rc = cfg.receiver;
+
+	await apiRequest('/updates/datos_facturacion.php', {
+		method: 'POST',
+		bearer,
+		body: {
+			id: orderId,
+			billing_data_id: billingDataId,
+			sat_codigo_postal: store.zipcode || '22760',
+			sat_domicilio_fiscal_receptor: rc.domicilioFiscal,
+			sat_forma_pago: rc.formaPago,
+			sat_razon_social: rc.razonSocial,
+			sat_receptor_email: rc.email,
+			sat_receptor_rfc: rc.rfc,
+			sat_regimen_capital_receptor: rc.regimenCapital,
+			sat_regimen_fiscal_receptor: rc.regimenFiscal,
+			sat_serie: cfg.serie,
+			sat_uso_cfdi: rc.usoCfdi
+		}
+	});
+
+	const order = (await apiRequest('/order_info.php?id=' + encodeURIComponent(orderId), { bearer })).order;
+
+	const facturada = await apiRequest('/facturacion_request.php', {
+		method: 'POST',
+		bearer,
+		body: {
+			facturacion_code: order.facturacion_code,
+			razon_social: rc.razonSocial,
+			email: rc.email,
+			rfc: rc.rfc,
+			domicilio_fiscal: rc.domicilioFiscal,
+			forma_de_pago: rc.formaPago,
+			regimen_fiscal: rc.regimenFiscal,
+			regimen_capital: rc.regimenCapital,
+			uso_cfdi: rc.usoCfdi,
+			version: '4.0',
+			billing_data_id: billingDataId,
+			apply_rounding_discount_adjustment: false
+		}
+	});
+
+	const result = facturada.order || facturada;
+
+	if (!result.sat_factura_id) {
+		throw new Error('Factura was not created: ' + JSON.stringify(facturada).slice(0, 300));
+	}
+
+	return apiRequest('/sat_factura.php?id=' + encodeURIComponent(result.sat_factura_id), { bearer });
+}
+
+QUnit.module('Factura 193108 al 8% (5 renglones, debito)');
+
+QUnit.test('renglones de la orden 193108: 4 al 8% y 1 al 16% suman total 631.50', function(assert) {
+	assert.expect(7);
+
+	const cfg = factura193108Config;
+	const rates = [8, 8, 16, 8, 8];
+
+	cfg.lines.forEach(function(line, index) {
+		const rate = rates[index];
+		const total = f179Round2(line.original * line.qty);
+		const unitary = f179Round2(total / (1 + rate / 100) / line.qty);
+		const subtotal = f179Round2(unitary * line.qty);
+		assert.deepEqual(
+			[unitary, subtotal, f179Round2(subtotal * (rate / 100)), total],
+			[line.unitary, line.subtotal, line.tax, line.total],
+			'renglon ' + (index + 1) + ' ' + line.name + ' al ' + rate + '% autoconsistente'
+		);
+	});
+
+	assert.deepEqual(
+		[cfg.orderSubtotal, cfg.orderTax, cfg.orderTotal],
+		[566.51, 64.94, 631.5],
+		'totales verbatim de la orden 193108 (subtotal + IVA = 631.45, 0.05 de redondeo por renglon)'
+	);
+	assert.equal(
+		f179Round2(cfg.lines.reduce(function(sum, line) { return sum + line.total; }, 0)),
+		cfg.orderTotal,
+		'suma de totales de renglon 631.50 = total de la orden'
+	);
+});
+
+QUnit.test('replica orden 193108 (5 renglones) e intenta CFDI al 8% forma 28', async function(assert) {
+	assert.timeout(300000);
+	assert.expect(35);
+
+	const cfg = factura193108Config;
+	const session = await login();
+	assert.ok(session.bearer, 'logged in');
+
+	const store = await f193ResolveStore(session.bearer);
+	assert.ok(store.id, 'sucursal resuelta ' + store.id + ' (' + (store.name || '?') + ')');
+	assert.equal(Number(store.tax_percent), cfg.taxPercent, 'sucursal al 8% igual que la orden 193108');
+	assert.equal(store.modo_facturacion, 'DESGLOSADA', 'sucursal con facturacion desglosada');
+
+	const billingDataId = await f193ResolveBillingDataId(store, session.bearer);
+	assert.ok(billingDataId, 'billing_data precision 6 autorizado para facturar ' + billingDataId);
+
+	const priceTypeId = await f179ResolvePriceTypeId(session.bearer, cfg.priceTypeId);
+	assert.ok(priceTypeId, 'price_type resuelto ' + priceTypeId);
+
+	const items = [];
+	for (const line of cfg.lines) {
+		const item = await getOrCreateItem(session.bearer, {
+			applicable_tax: line.applicableTax || 'DEFAULT',
+			availability_type: 'ON_STOCK',
+			clave_sat: line.claveSat,
+			code: line.code,
+			currency_id: cfg.currencyId,
+			measurement_unit: 'Pieza',
+			name: line.name,
+			note_required: 'NO',
+			on_sale: 'NO',
+			reference_price: line.unitary,
+			return_action: 'RETURN_TO_STOCK',
+			status: 'ACTIVE',
+			tax_percent: line.itemTaxPercent || 0,
+			unidad_medida_sat_id: line.unit
+		});
+		assert.ok(item.id, 'articulo resuelto ' + line.name + ' id ' + item.id);
+		items.push(item);
+		await f179EnsurePrice(session.bearer, item.id, line.total, priceTypeId);
+	}
+
+	const touched = [];
+	for (let index = 0; index < items.length; index++) {
+		const original = await f179StockOf(items[index].id, store.id, session.bearer);
+		await f179SetStock(items[index].id, store.id, original + cfg.lines[index].qty, session.bearer, 'POSTest factura 193108 inicio');
+		touched.push({ item: items[index], original: original });
+	}
+
+	try {
+		const created = await f193CreateOrder(items, store, priceTypeId, session.bearer, session.user.id);
+		const orderId = created.order.id;
+		assert.ok(orderId, 'orden creada ' + orderId);
+		assert.equal(Number(created.order.tax_percent), cfg.taxPercent, 'orden al 8%');
+		assert.ok(f179SameMoney(created.order.subtotal, cfg.orderSubtotal), 'orden con subtotal 566.51');
+		assert.ok(f179SameMoney(created.order.tax, cfg.orderTax), 'orden con IVA 64.94');
+		assert.ok(f179SameMoney(created.order.total, cfg.orderTotal), 'orden con total 631.50');
+		assert.ok(f179SameMoney(created.order.discount, cfg.orderDiscount), 'orden sin descuento');
+
+		created.items.forEach(function(orderItemInfo, index) {
+			const line = cfg.lines[index];
+			const createdItem = orderItemInfo.order_item;
+			assert.deepEqual(
+				[f179Round2(createdItem.unitary_price), f179Round2(createdItem.subtotal), f179Round2(createdItem.tax), f179Round2(createdItem.total)],
+				[line.unitary, line.subtotal, line.tax, line.total],
+				'orden conserva importes exactos del renglon ' + (index + 1) + ' ' + line.name
+			);
+		});
+
+		const closed = await f193PayAndClose(orderId, session.bearer);
+		assert.equal(closed.order.status, 'CLOSED', 'orden cerrada');
+		assert.equal(closed.order.paid_status, 'PAID', 'orden pagada (debito)');
+		assert.ok(f179SameMoney(closed.order.amount_paid, cfg.amountPaid), 'orden con amount_paid 631.50');
+
+		// El CFDI debe timbrar forma 28 con 5 conceptos (4 traslados al 8% y
+		// 1 al 16%): cualquier error de facturacion_request falla el test.
+		try {
+			const satFactura = await f193Facturar(orderId, store, billingDataId, session.bearer);
+			assert.ok(satFactura.uuid, 'CFDI timbrado al 8% ' + satFactura.uuid);
+			assert.equal(satFactura.type, 'NORMAL', 'sat_factura NORMAL');
+
+			const xml = await f179FetchXmlText(session.bearer, satFactura.xml_attachment_id);
+			const comprobanteTotal = f179XmlAttr(xml, 'cfdi:Comprobante', 'Total');
+			assert.ok(
+				Math.abs(Number(comprobanteTotal) - cfg.orderTotal) < 0.02,
+				'comprobante con total 631.50 (llego ' + comprobanteTotal + ')'
+			);
+			assert.ok(
+				Math.abs(Number(f179XmlAttr(xml, 'cfdi:Comprobante', 'SubTotal')) - cfg.orderSubtotal) < 0.02,
+				'comprobante con subtotal cercano a 566.51'
+			);
+			assert.ok(
+				Math.abs(Number(f179XmlAttr(xml, 'cfdi:Impuestos', 'TotalImpuestosTrasladados')) - cfg.orderTax) < 0.03,
+				'impuestos trasladados cercanos a 64.94'
+			);
+
+			const traslados = xml.match(/<cfdi:Traslado\b[^>]*>/g) || [];
+			assert.ok(
+				traslados.some(function(tag) { return Math.abs(Number((tag.match(/TasaOCuota="([^"]*)"/) || [])[1]) - 0.08) < 1e-6; }),
+				'traslado a tasa 8% presente'
+			);
+			assert.ok(
+				traslados.some(function(tag) { return Math.abs(Number((tag.match(/TasaOCuota="([^"]*)"/) || [])[1]) - 0.16) < 1e-6; }),
+				'traslado a tasa 16% presente (renglon COMEX 100 PRIM)'
+			);
+
+			const conceptos = xml.match(/<cfdi:Concepto\b[^>]*>/g) || [];
+			assert.equal(conceptos.length, 5, 'comprobante con 5 conceptos');
+			assert.ok(
+				Math.abs(Number(f179ConceptoAttr(xml, 2, 'ValorUnitario')) - 245.26) < 0.01,
+				'concepto 3 unitario 245.26'
+			);
+			assert.ok(
+				Math.abs(Number(f179ConceptoAttr(xml, 2, 'Importe')) - 245.26) < 0.01,
+				'concepto 3 importe 245.26'
+			);
+
+			// Ids visibles para revisar la orden/factura en la interfaz.
+			console.log(
+				'Factura 193108 -> ORDEN CONSERVADA ' + orderId
+				+ ' | FACTURA ' + satFactura.id + ' | UUID ' + satFactura.uuid
+				+ ' | Total CFDI ' + comprobanteTotal
+			);
+		}
+		catch (error) {
+			const message = String((error && error.message) || error);
+			console.log(
+				'Factura 193108 -> ORDEN CONSERVADA ' + orderId
+				+ ' sin timbrar: ' + message.slice(0, 300)
+			);
+			throw error;
+		}
+	}
+	finally {
+		for (const entry of touched) {
+			await f179SetStock(entry.item.id, store.id, entry.original, session.bearer, 'POSTest factura 193108 restauracion');
+		}
 	}
 });

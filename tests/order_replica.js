@@ -175,18 +175,15 @@ async function orGetSharedItem(bearer) {
 	return orSharedItem;
 }
 
-// billing_data canonico por tasa a precision 2: 16% demo1@sicofi.com.mx,
-// 8% fronterizodemo625@mail.com. Politica de solo 2 cuentas PAC (ver
-// resolveCanonicalBillingDataId en test_utils.js): sin ids fijos ni filas
-// arbitrarias. La preparacion tampoco debe fallar aqui: el helper crea la
-// combinacion canonica si falta.
+// billing_data canonico declarado por tasa, sin mezclar conceptos: cada rama
+// dice su cuenta (rate) y su precision (16% a precision 6, 8% a precision 6).
+// Sin ids fijos ni filas arbitrarias. La preparacion tampoco debe fallar
+// aqui: el helper crea la combinacion canonica si falta.
 async function orResolveBillingDataId(store, bearer) {
-	var rate = store && Number(store.tax_percent) === 8 ? '8' : '16';
-	return resolveCanonicalBillingDataId(bearer, {
-		rate: rate,
-		precision: 2,
-		rfc: store && store.rfc
-	});
+	if (store && Number(store.tax_percent) === 8) {
+		return resolveCanonicalBillingDataId(bearer, { rate: '8', precision: 6, rfc: store.rfc });
+	}
+	return resolveCanonicalBillingDataId(bearer, { rate: '16', precision: 6, rfc: store && store.rfc });
 }
 
 // El price_type_id de origen puede no existir en destino (FK order_ibfk_10).

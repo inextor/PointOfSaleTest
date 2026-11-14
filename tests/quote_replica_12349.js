@@ -37,7 +37,7 @@ const quoteReplicaTestConfig = {
 	billingDataRegimen: '612',
 	receiver: {
 		razonSocial: 'Prueba',
-		email: 'paogomezc7@gmail.com',
+		email: 'paogomezc7@integranet.xyz',
 		rfc: 'XAXX010101000',
 		domicilioFiscal: '22785',
 		regimenFiscal: '616',
@@ -203,13 +203,13 @@ async function qrResolveStore(session, bearer) {
 	return store;
 }
 
-// billing_data canonico 8% a precision 2: cuenta fronterizodemo625@mail.com.
+// billing_data canonico 8% a precision 6: cuenta fronterizodemo652@mail.com.
 // Politica de solo 2 cuentas PAC (ver resolveCanonicalBillingDataId en
 // test_utils.js): no se usan ids fijos ni filas arbitrarias.
 async function qrResolveBillingDataId(store, bearer) {
 	return resolveCanonicalBillingDataId(bearer, {
 		rate: '8',
-		precision: 2,
+		precision: 6,
 		rfc: store && store.rfc
 	});
 }

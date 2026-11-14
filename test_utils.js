@@ -629,13 +629,13 @@ async function resolveBankAccountForTest(session, storeId) {
 
 // Politica canonica de billing_data: solo existen 2 cuentas PAC autorizadas.
 // - Pruebas al 16%: demo1@sicofi.com.mx / demodemoD
-// - Pruebas al 8% (estimulo fronterizo): fronterizodemo625@mail.com / 12345
-// Cada cuenta se usa en precision 2 y precision 6 segun lo que pida el caso.
+// - Pruebas al 8% (estimulo fronterizo): fronterizodemo652@mail.com / 12345
+// Todo timbrado usa precision 6 en ambas cuentas.
 // Los resolvers deben usar resolveCanonicalBillingDataId en vez de ids
 // fijos o de clonar filas arbitrarias, para no proliferar billing_data.
 var billingDataPolicy = {
 	rate16: { usuario: 'demo1@sicofi.com.mx', password: 'demodemoD', label: '16%' },
-	rate8: { usuario: 'fronterizodemo625@mail.com', password: '12345', label: '8%' },
+	rate8: { usuario: 'fronterizodemo652@mail.com', password: '12345', label: '8%' },
 	precisions: [2, 6]
 };
 

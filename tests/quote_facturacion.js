@@ -5,7 +5,7 @@
 const quoteFacturacionTestConfig = {
 	storeId: 1, // CEDIS: 16% y DESGLOSADA (la creacion fuerza el impuesto del almacen)
 	billingDataId: 12, // legado: qfResolveBillingDataId ahora resuelve el
-	// canonico 16% precision 2 (demo1@sicofi.com.mx) sin usar este id.
+	// canonico 16% precision 6 (demo1@sicofi.com.mx) sin usar este id.
 	taxPercent: 16,
 	priceTypeId: 1,
 	serie: 'A',
@@ -303,13 +303,12 @@ function qfRowHasDemoPac(row) {
 	});
 }
 
-// billing_data canonico 16% a precision 2 (la fila precision 6 rompe las
-// sumas del PAC): cuenta demo1@sicofi.com.mx.
+// billing_data canonico 16% a precision 6: cuenta demo1@sicofi.com.mx.
 // Politica de solo 2 cuentas PAC (ver resolveCanonicalBillingDataId en
 // test_utils.js): no se usan ids fijos ni copias arbitrarias.
 // No se toca la creacion de cotizacion/orden/pago.
 async function qfResolveBillingDataId(bearer) {
-	return resolveCanonicalBillingDataId(bearer, { rate: '16', precision: 2 });
+	return resolveCanonicalBillingDataId(bearer, { rate: '16', precision: 6 });
 }
 
 async function qfFacturar(orderId, bearer, applyExactTotal) {

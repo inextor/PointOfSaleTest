@@ -1,10 +1,10 @@
 // Politica canonica de billing_data: solo existen 2 cuentas PAC autorizadas.
 // - Pruebas al 16%: demo1@sicofi.com.mx / demodemoD
-// - Pruebas al 8% (estimulo fronterizo): fronterizodemo625@mail.com / 12345
-// Cada cuenta se usa en precision 2 y precision 6 segun el caso:
-// 16%/2 (quote_facturacion, order_replica 16%), 16%/6 (factura_truncado,
-// factura_credito, factura_reuse, factura_pago_comun), 8%/2 (factura_179047,
-// quote_replica_12349, order_replica 8%), 8%/6 (combinacion disponible).
+// - Pruebas al 8% (estimulo fronterizo): fronterizodemo652@mail.com / 12345
+// Todo timbrado usa precision 6 en ambas cuentas:
+// 16%/6 (factura_truncado, quote_facturacion, order_replica 16%,
+// factura_credito, factura_reuse, factura_pago_comun), 8%/6 (factura_179047,
+// quote_replica_12349, order_replica 8%).
 // Los resolvers (resolveCanonicalBillingDataId en test_utils.js) reutilizan
 // estas filas y solo crean la combinacion canonica que falte.
 QUnit.module('billing_data policy');
@@ -37,7 +37,7 @@ QUnit.test('solo existen las 2 cuentas PAC canonicas', async function(assert) {
 	);
 });
 
-QUnit.test('combinaciones cuenta x precision 2 y 6 disponibles', async function(assert) {
+QUnit.test('combinaciones cuenta x precision 6 disponibles', async function(assert) {
 	assert.timeout(60000);
 
 	const session = await login();
@@ -49,9 +49,7 @@ QUnit.test('combinaciones cuenta x precision 2 y 6 disponibles', async function(
 		.filter(function(r) { return r && r.id; });
 
 	const cases = [
-		{ rate: '16', precision: 2 },
 		{ rate: '16', precision: 6 },
-		{ rate: '8', precision: 2 },
 		{ rate: '8', precision: 6 }
 	];
 	assert.expect(cases.length + 1);
@@ -68,3 +66,4 @@ QUnit.test('combinaciones cuenta x precision 2 y 6 disponibles', async function(
 		);
 	});
 });
+
