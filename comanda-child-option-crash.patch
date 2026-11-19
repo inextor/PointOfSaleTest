@@ -1,0 +1,134 @@
+# Fix: kitchen comanda crash "Cannot read properties of undefined (reading 'item_option')"
+#
+# Applies in: AutoPOS/legacy_frontend
+#   git apply comanda-child-option-crash.patch
+#
+# Root cause (two parts):
+#  1. Seed data (POSTest printer_tickets_seed.js, now fixed): two independent
+#     sale lines shared one item_group. createStructuredItems
+#     (rest.service.ts) groups consecutive same-group lines into parent +
+#     childs, so the second line became an option-child with a null
+#     item_option_id. The seed now writes group / group+1 and the live
+#     Ticket orders 192858-192861 were recreated that way.
+#  2. Latent frontend crash: printNewItemsInCommanda (line ~905/917) and
+#     printAllItems (line ~1017/1029) dereference the find() result without
+#     a guard, while the USB path commandaXmlLines (line ~785) already
+#     guards with `option ? ... : ''`. Any child whose item_option_id
+#     matches nothing (shared group, deleted option, null id) crashes the
+#     whole ticket on the HTML fallback path.
+#
+# This patch extracts the guarded lookup into resolveComandaChildLabel
+# (same pattern as resolveComandaTableName in the same file) and uses it
+# at all three sites, plus spec coverage in view-commanda-usb.spec.ts.
+
+diff --git a/src/app/pages/view-commanda/view-commanda.component.ts b/src/app/pages/view-commanda/view-commanda.component.ts
+--- a/src/app/pages/view-commanda/view-commanda.component.ts
++++ b/src/app/pages/view-commanda/view-commanda.component.ts
+@@ -59,6 +59,25 @@ export async function resolveComandaTableName(rest: ComandaTableLookup, tableId:
+ 	}
+ 	return String(tableId);
+ }
++
++/**
++ * Label for an option-child line on a kitchen comanda. A child whose
++ * item_option_id matches no known option (plain sale line sharing the
++ * parent item_group, deleted option, null id) prints as the bare item
++ * name instead of crashing the whole ticket.
++ */
++export function resolveComandaChildLabel(
++	options: { item_option?: { id?: number | null; name?: string | null } | null }[] | null | undefined,
++	itemOptionId: number | null | undefined,
++	itemName: string
++): string
++{
++	const option = (options || []).find((o) => o?.item_option != null && o.item_option.id == itemOptionId);
++	const optionName = option?.item_option?.name;
++	return (optionName ? optionName + ' ' : '') + itemName;
++}
+ 
+ @Component({
+ selector: 'app-view-commanda',
+@@ -782,9 +801,8 @@ export class ViewCommandaComponent extends BaseComponent implements OnInit
+ 			const name = (showCategory && oii.category?.name) ? `${oii.category.name} - ${oii.item.name}` : oii.item.name;
+ 			const options = (oii.childs || []).map((oi)=>
+ 			{
+-				const option = (oii.options || []).find((o)=>o.item_option.id == oi.order_item.item_option_id);
+ 				const child_qty = oi.order_item.item_option_qty > 1 ? `${oi.order_item.item_option_qty}x ` : '';
+-				return `${child_qty}${option ? option.item_option.name + ' ' : ''}${oi.item.name}`;
++				return `${child_qty}${resolveComandaChildLabel(oii.options, oi.order_item.item_option_id, oi.item.name)}`;
+ 			});
+ 			return {
+ 				qty: oii.order_item.qty,
+@@ -902,7 +920,7 @@ export class ViewCommandaComponent extends BaseComponent implements OnInit
+ 
+ 			for(let oi of oii.childs)
+ 			{
+-				let option = oii.options.find((o)=>o.item_option.id == oi.order_item.item_option_id);
++				let child_label = resolveComandaChildLabel(oii.options, oi.order_item.item_option_id, oi.item.name);
+ 
+ 				let child_qty = oi.order_item.item_option_qty > 1 ? `${oi.order_item.item_option_qty}x ` : '';
+ 
+@@ -914,7 +932,7 @@ export class ViewCommandaComponent extends BaseComponent implements OnInit
+ 
+ 				sss += `
+ 					<div style="padding-left:10px;margin-bottom:8px">
+-					· ${child_qty}${txt2html(option.item_option.name+' '+oi.item.name)}
++					· ${child_qty}${txt2html(child_label)}
+ 					${child_note}
+ 					</div>`;
+ 			}
+@@ -1014,7 +1032,7 @@ export class ViewCommandaComponent extends BaseComponent implements OnInit
+ 					for(let oi of oii.childs)
+ 					{
+ 						i++;
+ 
+-						let option = oii.options.find((o)=>o.item_option.id == oi.order_item.item_option_id);
++						let child_label = resolveComandaChildLabel(oii.options, oi.order_item.item_option_id, oi.item.name);
+ 
+ 						let child_qty = oi.order_item.item_option_qty > 1 ? `${oi.order_item.item_option_qty}x ` : '';
+ 
+@@ -1026,7 +1044,7 @@ export class ViewCommandaComponent extends BaseComponent implements OnInit
+ 
+ 						sss += `
+ 						<div class="${border_class}" style="padding-left:10px;margin-bottom:8px">
+-							· ${child_qty}${txt2html(option.item_option.name+' '+oi.item.name)}
++							· ${child_qty}${txt2html(child_label)}
+ 							${child_note}
+ 						</div>`;
+ 					}
+diff --git a/src/app/pages/view-commanda/view-commanda-usb.spec.ts b/src/app/pages/view-commanda/view-commanda-usb.spec.ts
+--- a/src/app/pages/view-commanda/view-commanda-usb.spec.ts
++++ b/src/app/pages/view-commanda/view-commanda-usb.spec.ts
+@@ -1,5 +1,5 @@
+ import { of } from 'rxjs';
+-import { ComandaTableLookup, resolveComandaTableName } from './view-commanda.component';
++import { ComandaTableLookup, resolveComandaChildLabel, resolveComandaTableName } from './view-commanda.component';
+ 
+ function makeLookup(offline: { toPromise(): Promise<any> }, onlineName: string | null, onlineCalls: { count: number }, is_offline = false): ComandaTableLookup
+ {
+@@ -83,3 +83,26 @@ describe('resolveComandaTableName', () => {
+ 		expect(onlineCalls.count).toBe(0);
+ 	});
+ });
++
++describe('resolveComandaChildLabel', () => {
++	const options = [{ item_option: { id: 7, name: 'Grande' } }];
++
++	it('prefixes the option name on a match', () => {
++		expect(resolveComandaChildLabel(options, 7, 'Taco')).toBe('Grande Taco');
++	});
++
++	it('prints the bare item name when the child has no option (shared item_group)', () => {
++		expect(resolveComandaChildLabel([], null, 'Printer Ticket Stock Item'))
++			.toBe('Printer Ticket Stock Item');
++	});
++
++	it('prints the bare item name when the option was deleted', () => {
++		expect(resolveComandaChildLabel(options, 999, 'Taco')).toBe('Taco');
++	});
++
++	it('does not throw when the option list is missing', () => {
++		expect(() => resolveComandaChildLabel(undefined, null, 'Taco')).not.toThrow();
++		expect(resolveComandaChildLabel(undefined, null, 'Taco')).toBe('Taco');
++	});
++});
